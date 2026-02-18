@@ -1,9 +1,30 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/store/authStore';
 import Link from 'next/link';
 import Image from 'next/image';
 
 export default function Home() {
+  const router = useRouter();
+  const user = useAuthStore((state) => state.user);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Wait for Zustand to rehydrate from localStorage
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isHydrated) return; // Wait for hydration
+    
+    // If user is logged in, redirect to dashboard
+    if (user) {
+      router.push('/dashboard');
+    }
+  }, [user, router, isHydrated]);
+
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
       {/* Header */}

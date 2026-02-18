@@ -67,7 +67,7 @@ export default function SignupPage() {
       
       setAuth(user, token);
       toast.success('Account created successfully!');
-      router.push('/dashboard');
+      router.push('/setup-profile');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Verification failed');
     } finally {
@@ -194,6 +194,7 @@ export default function SignupPage() {
 
             <button
               type="button"
+              onClick={() => window.location.href = 'http://localhost:3000/auth/google'}
               className="w-full bg-gray-900 border border-gray-800 text-white py-3 rounded-full font-semibold hover:bg-gray-800 transition flex items-center justify-center gap-2"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -206,7 +207,7 @@ export default function SignupPage() {
             </button>
           </form>
 
-          <p className="mt-8 text-center text-gray-400">
+          <p className="mt-8 mb-10 text-center text-gray-400">
             Already have an account?{' '}
             <Link href="/login" className="text-white hover:underline">
               Log in
