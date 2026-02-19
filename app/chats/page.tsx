@@ -295,7 +295,7 @@ export default function ChatsPage() {
                               conversation.lastMessage.content && conversation.lastMessage.content !== 'Image' ? (
                                 `📷 ${conversation.lastMessage.content}`
                               ) : (
-                                '📷 Image'
+                                '📷 Photo'
                               )
                             ) : (
                               conversation.lastMessage.content
