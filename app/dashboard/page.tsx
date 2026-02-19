@@ -583,7 +583,10 @@ export default function DashboardPage() {
               <Image src="/logo.png" alt="TarpAI" width={24} height={24} className="w-6 h-6" />
               <span className="text-xs">TarpAI</span>
             </button>
-            <button className="flex flex-col items-center gap-1 text-gray-400 hover:text-white">
+            <button 
+              onClick={() => router.push('/chats')}
+              className="flex flex-col items-center gap-1 text-gray-400 hover:text-white"
+            >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
@@ -782,8 +785,11 @@ export default function DashboardPage() {
 
       {/* Notifications Modal */}
       {showNotificationsModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center px-6">
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[80vh] overflow-hidden relative flex flex-col">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowNotificationsModal(false)}>
+          <div 
+            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-6 border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-bold text-black">Notifications</h2>

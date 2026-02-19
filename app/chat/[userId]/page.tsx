@@ -13,7 +13,14 @@ interface Message {
   _id: string;
   sender: string;
   content: string;
+  type?: string;
+  fileUrl?: string;
   createdAt: string;
+  replyTo?: {
+    _id: string;
+    sender: string;
+    content: string;
+  };
 }
 
 interface ChatUser {
@@ -36,8 +43,20 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [swipedMessageId, setSwipedMessageId] = useState<string | null>(null);
+  const [touchStartX, setTouchStartX] = useState(0);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Wait a bit for auth store to rehydrate from localStorage
@@ -61,6 +80,11 @@ export default function ChatPage() {
 
     return () => {
       if (socketRef.current) {
+        // Leave the conversation before disconnecting
+        const conversationId = (socketRef.current as any).conversationId;
+        if (conversationId) {
+          socketRef.current.emit('leave_conversation', { conversationId });
+        }
         socketRef.current.disconnect();
       }
     };
@@ -78,6 +102,14 @@ export default function ChatPage() {
       });
       const conversationId = conversationResponse.data.id;
 
+      // Mark messages as read
+      try {
+        await api.put(`/chat/conversations/${conversationId}/read`);
+        console.log('Messages marked as read');
+      } catch (error) {
+        console.error('Failed to mark messages as read:', error);
+      }
+
       // Initialize socket connection
       const token = localStorage.getItem('token');
       const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000', {
@@ -88,33 +120,42 @@ export default function ChatPage() {
 
       socket.on('connect', () => {
         console.log('Socket connected');
-        // Join the conversation room
-        socket.emit('join_conversation', { conversationId });
-        // Request online status of the other user immediately
-        socket.emit('check_user_status', { userId });
-        // Check again after 1 second to catch users who joined after us
+        // Join the conversation room and get existing viewers
+        socket.emit('join_conversation', { conversationId }, (response: any) => {
+          console.log('Join conversation response:', response);
+          if (response?.existingViewers && response.existingViewers.includes(userId)) {
+            setIsOnline(true);
+          }
+        });
+        
+        // Check if the other user is viewing after 500ms
         setTimeout(() => {
-          socket.emit('check_user_status', { userId });
-        }, 1000);
+          socket.emit('check_conversation_viewer', { conversationId, userId });
+        }, 500);
+        
+        // Check again after 2 seconds to catch late joiners
+        setTimeout(() => {
+          socket.emit('check_conversation_viewer', { conversationId, userId });
+        }, 2000);
       });
 
-      socket.on('user_status', (data: { userId: string; isOnline: boolean }) => {
-        console.log('User status:', data);
-        if (data.userId === userId) {
-          setIsOnline(data.isOnline);
+      socket.on('conversation_viewer_status', (data: { conversationId: string; userId: string; isViewing: boolean }) => {
+        console.log('Conversation viewer status:', data);
+        if (data.conversationId === conversationId && data.userId === userId) {
+          setIsOnline(data.isViewing);
         }
       });
 
-      socket.on('user_online', (data: { userId: string }) => {
-        console.log('User online:', data.userId);
-        if (data.userId === userId) {
+      socket.on('user_joined_conversation', (data: { conversationId: string; userId: string }) => {
+        console.log('User joined conversation:', data);
+        if (data.conversationId === conversationId && data.userId === userId) {
           setIsOnline(true);
         }
       });
 
-      socket.on('user_offline', (data: { userId: string }) => {
-        console.log('User offline:', data.userId);
-        if (data.userId === userId) {
+      socket.on('user_left_conversation', (data: { conversationId: string; userId: string }) => {
+        console.log('User left conversation:', data);
+        if (data.conversationId === conversationId && data.userId === userId) {
           setIsOnline(false);
         }
       });
@@ -136,10 +177,38 @@ export default function ChatPage() {
             _id: message.id,
             sender: message.sender._id || message.sender,
             content: message.content,
+            type: message.type,
+            fileUrl: message.fileUrl,
             createdAt: message.createdAt,
+            replyTo: message.replyTo ? {
+              _id: message.replyTo.id,
+              sender: message.replyTo.sender,
+              content: message.replyTo.content,
+            } : undefined,
           }];
         });
+        
+        // Automatically mark as read if we're viewing this conversation
+        const conversationId = (socketRef.current as any).conversationId;
+        if (conversationId && message.sender._id !== currentUser?.id) {
+          // Mark the message as read immediately
+          api.put(`/chat/conversations/${conversationId}/read`).catch(err => {
+            console.error('Failed to mark message as read:', err);
+          });
+        }
+        
         scrollToBottom();
+      });
+
+      socket.on('message_deleted', (data: { messageId: string; conversationId: string }) => {
+        console.log('Message deleted:', data);
+        setMessages(prev => prev.filter(m => m._id !== data.messageId));
+        // Clear selection if deleted message was selected
+        setSelectedMessages(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(data.messageId);
+          return newSet;
+        });
       });
 
       socket.on('disconnect', () => {
@@ -153,7 +222,14 @@ export default function ChatPage() {
           _id: msg.id,
           sender: msg.sender._id || msg.sender,
           content: msg.content,
+          type: msg.type,
+          fileUrl: msg.fileUrl,
           createdAt: msg.createdAt,
+          replyTo: msg.replyTo ? {
+            _id: msg.replyTo.id,
+            sender: msg.replyTo.sender,
+            content: msg.replyTo.content,
+          } : undefined,
         })));
         scrollToBottom();
       } catch (error) {
@@ -182,7 +258,7 @@ export default function ChatPage() {
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !socketRef.current) return;
+    if ((!newMessage.trim() && !selectedImage) || !socketRef.current) return;
 
     setSending(true);
     const messageContent = newMessage.trim();
@@ -196,24 +272,67 @@ export default function ChatPage() {
         return;
       }
 
-      const messageData = {
-        conversationId,
-        content: messageContent,
-        type: 'text',
-      };
+      // If there's an image, upload it via REST API
+      if (selectedImage) {
+        setUploadingImage(true);
+        const formData = new FormData();
+        formData.append('file', selectedImage);
+        formData.append('content', messageContent || 'Image');
+        formData.append('type', 'image');
+        if (replyingTo) {
+          formData.append('replyTo', replyingTo._id);
+        }
 
-      console.log('Sending message:', messageData);
+        try {
+          await api.post(`/chat/conversations/${conversationId}/messages`, formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          });
+          
+          setSelectedImage(null);
+          setImagePreview(null);
+          setReplyingTo(null);
+          toast.success('Image sent');
+        } catch (error) {
+          console.error('Failed to send image:', error);
+          toast.error('Failed to send image');
+        } finally {
+          setUploadingImage(false);
+        }
+      } else {
+        // Send text message via socket
+        const messageData: any = {
+          conversationId,
+          content: messageContent,
+          type: 'text',
+        };
+
+        // Add reply information if replying to a message
+        if (replyingTo) {
+          messageData.replyTo = replyingTo._id;
+        }
+
+        console.log('Sending message:', messageData);
+        
+        // Add message optimistically to UI
+        const tempMessage: Message = {
+          _id: `temp-${Date.now()}`,
+          sender: currentUser?.id || '',
+          content: messageContent,
+          createdAt: new Date().toISOString(),
+          replyTo: replyingTo ? {
+            _id: replyingTo._id,
+            sender: replyingTo.sender,
+            content: replyingTo.content,
+          } : undefined,
+        };
+        setMessages(prev => [...prev, tempMessage]);
+        
+        socketRef.current.emit('send_message', messageData);
+        setReplyingTo(null); // Clear reply state
+      }
       
-      // Add message optimistically to UI
-      const tempMessage: Message = {
-        _id: `temp-${Date.now()}`,
-        sender: currentUser?.id || '',
-        content: messageContent,
-        createdAt: new Date().toISOString(),
-      };
-      setMessages(prev => [...prev, tempMessage]);
-      
-      socketRef.current.emit('send_message', messageData);
       scrollToBottom();
     } catch (error: any) {
       console.error('Failed to send message:', error);
@@ -223,10 +342,166 @@ export default function ChatPage() {
     }
   };
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast.error('Image size must be less than 5MB');
+        return;
+      }
+      
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file');
+        return;
+      }
+
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent, message: Message) => {
+    setTouchStartX(e.touches[0].clientX);
+    setSwipedMessageId(message._id);
+    
+    // Start long press timer for selection mode
+    if (selectedMessages.size === 0) {
+      const timer = setTimeout(() => {
+        setSelectedMessages(new Set([message._id]));
+      }, 500); // 500ms long press
+      setLongPressTimer(timer);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent, messageId: string, isOwn: boolean) => {
+    // Cancel long press if user moves finger
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+    
+    // Don't allow swipe in selection mode
+    if (selectedMessages.size > 0) {
+      return;
+    }
+    
+    const currentX = e.touches[0].clientX;
+    const diff = currentX - touchStartX;
+    
+    // Only allow swipe in the correct direction
+    // Left messages: swipe right (positive diff)
+    // Right messages: swipe left (negative diff)
+    if ((isOwn && diff < 0) || (!isOwn && diff > 0)) {
+      // Limit swipe distance to 80px
+      const limitedDiff = Math.max(Math.min(Math.abs(diff), 80), 0);
+      setSwipeOffset(isOwn ? -limitedDiff : limitedDiff);
+    }
+  };
+
+  const handleTouchEnd = (message: Message) => {
+    // Clear long press timer
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+    
+    // If swiped more than 60px, trigger reply (only if not in selection mode)
+    if (Math.abs(swipeOffset) > 60 && selectedMessages.size === 0) {
+      setReplyingTo(message);
+    }
+    
+    // Reset swipe state
+    setSwipeOffset(0);
+    setTimeout(() => {
+      setSwipedMessageId(null);
+    }, 200);
+  };
+
+  const handleMessageClick = (messageId: string) => {
+    if (selectedMessages.size > 0) {
+      // Toggle selection
+      const newSelected = new Set(selectedMessages);
+      if (newSelected.has(messageId)) {
+        newSelected.delete(messageId);
+      } else {
+        newSelected.add(messageId);
+      }
+      setSelectedMessages(newSelected);
+    }
+  };
+
+  const handleDeleteMessages = async () => {
+    if (selectedMessages.size === 0 || !socketRef.current) return;
+    
+    // Check if any selected messages are not owned by current user
+    const selectedMessageObjects = messages.filter(m => selectedMessages.has(m._id));
+    const hasOtherUsersMessages = selectedMessageObjects.some(m => m.sender !== currentUser?.id);
+    
+    if (hasOtherUsersMessages) {
+      toast.error('You can only delete your own messages');
+      return;
+    }
+    
+    try {
+      const conversationId = (socketRef.current as any).conversationId;
+      
+      if (!conversationId) {
+        toast.error('Conversation not initialized');
+        return;
+      }
+
+      // Delete each selected message via socket
+      for (const messageId of selectedMessages) {
+        socketRef.current.emit('delete_message', { 
+          messageId, 
+          conversationId 
+        });
+      }
+      
+      // Update local state immediately (optimistic update)
+      setMessages(prev => prev.filter(m => !selectedMessages.has(m._id)));
+      setSelectedMessages(new Set());
+      toast.success(`Deleted ${selectedMessages.size} message${selectedMessages.size > 1 ? 's' : ''}`);
+    } catch (error) {
+      console.error('Failed to delete messages:', error);
+      toast.error('Failed to delete messages');
+    }
+  };
+
+  const handleCancelSelection = () => {
+    setSelectedMessages(new Set());
+  };
+
+  const handleReplyClick = (replyToId: string) => {
+    // Find the message element and scroll to it
+    const messageElement = messageRefs.current[replyToId];
+    if (messageElement) {
+      messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      
+      // Highlight the message briefly
+      setHighlightedMessageId(replyToId);
+      setTimeout(() => {
+        setHighlightedMessageId(null);
+      }, 2000);
     }
   };
 
@@ -262,61 +537,169 @@ export default function ChatPage() {
       <div className="relative z-10 flex flex-col h-screen">
         {/* Header */}
         <div className="bg-black/40 backdrop-blur-md border-b border-white/10 p-4 flex items-center gap-3">
-          <button
-            onClick={() => router.back()}
-            className="text-gray-300 hover:text-white"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
+          {selectedMessages.size > 0 ? (
+            <>
+              {/* Selection Mode Header */}
+              <button
+                onClick={handleCancelSelection}
+                className="text-gray-300 hover:text-white"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
 
-          <Image
-            src={chatUser.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
-            alt={chatUser.name}
-            width={40}
-            height={40}
-            className="w-10 h-10 rounded-full object-cover"
-          />
+              <div className="flex-1">
+                <h2 className="font-semibold">{selectedMessages.size} selected</h2>
+              </div>
 
-          <div className="flex-1">
-            <h2 className="font-semibold">{chatUser.displayName || chatUser.name}</h2>
-            {isOnline ? (
-              <p className="text-xs text-green-500">Active now</p>
-            ) : (
-              <p className="text-xs text-gray-400">Offline</p>
-            )}
-          </div>
+              <button
+                onClick={handleDeleteMessages}
+                className="text-red-500 hover:text-red-400"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Normal Header */}
+              <button
+                onClick={() => router.back()}
+                className="text-gray-300 hover:text-white"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
 
-          <button className="text-gray-300 hover:text-white">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-            </svg>
-          </button>
+              <Image
+                src={chatUser.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
+                alt={chatUser.name}
+                width={40}
+                height={40}
+                className="w-10 h-10 rounded-full object-cover"
+              />
+
+              <div className="flex-1">
+                <h2 className="font-semibold">{chatUser.displayName || chatUser.name}</h2>
+                {isOnline ? (
+                  <p className="text-xs text-green-500">Active now</p>
+                ) : (
+                  <p className="text-xs text-gray-400">Offline</p>
+                )}
+              </div>
+
+              <button className="text-gray-300 hover:text-white">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                </svg>
+              </button>
+            </>
+          )}
         </div>
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.map((message) => {
             const isOwn = message.sender === currentUser?.id;
+            const isHighlighted = highlightedMessageId === message._id;
+            const isSelected = selectedMessages.has(message._id);
+            const isImageMessage = message.type === 'image' && message.fileUrl;
+            
             return (
               <div
                 key={message._id}
-                className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                ref={(el) => { messageRefs.current[message._id] = el; }}
+                className={`flex ${isOwn ? 'justify-end' : 'justify-start'} items-center gap-2`}
               >
+                {selectedMessages.size > 0 && (
+                  <div 
+                    onClick={() => handleMessageClick(message._id)}
+                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer ${
+                      isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-400'
+                    }`}
+                  >
+                    {isSelected && (
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                )}
                 <div
-                  className={`max-w-[70%] rounded-2xl px-4 py-2 ${
+                  onTouchStart={(e) => handleTouchStart(e, message)}
+                  onTouchMove={(e) => handleTouchMove(e, message._id, isOwn)}
+                  onTouchEnd={() => handleTouchEnd(message)}
+                  onClick={() => handleMessageClick(message._id)}
+                  style={{
+                    transform: swipedMessageId === message._id ? `translateX(${swipeOffset}px)` : 'none',
+                    transition: swipedMessageId === message._id && swipeOffset === 0 ? 'transform 0.2s ease-out' : 'none',
+                  }}
+                  className={`max-w-[70%] rounded-2xl ${isImageMessage ? 'p-1' : 'px-4 py-2'} relative ${
                     isOwn
                       ? 'bg-white text-black'
                       : 'bg-black/60 backdrop-blur-md text-white border border-white/10'
-                  }`}
+                  } ${isHighlighted ? 'ring-2 ring-blue-500 ring-opacity-50' : ''} ${isSelected ? 'ring-2 ring-blue-600' : ''}`}
                 >
-                  <div className="flex flex-wrap items-end gap-2">
-                    <p className="flex-1 min-w-0">{message.content}</p>
-                    <span className={`text-xs whitespace-nowrap ml-auto ${isOwn ? 'opacity-60' : 'opacity-70'}`}>
-                      {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
+                  {message.replyTo && (
+                    <div 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleReplyClick(message.replyTo!._id);
+                      }}
+                      className={`${isImageMessage ? 'mx-3 mt-2' : ''} mb-2 pl-3 border-l-4 ${isOwn ? 'border-green-600' : 'border-green-500'} py-1 cursor-pointer hover:opacity-80 transition`}
+                    >
+                      <p className={`text-xs font-semibold ${isOwn ? 'text-green-700' : 'text-green-400'}`}>
+                        {message.replyTo.sender === currentUser?.id ? 'You' : chatUser?.displayName || chatUser?.name}
+                      </p>
+                      <p className={`text-xs ${isOwn ? 'opacity-60' : 'opacity-70'} truncate`}>
+                        {message.replyTo.content}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {isImageMessage ? (
+                    <div className="space-y-1">
+                      <Image
+                        src={message.fileUrl || ''}
+                        alt="Shared image"
+                        width={300}
+                        height={300}
+                        className="rounded-xl max-w-full h-auto object-cover"
+                      />
+                      {message.content && message.content !== 'Image' && (
+                        <div className={`px-3 pb-2 ${isOwn ? 'text-black' : 'text-white'}`}>
+                          <p className="text-sm">{message.content}</p>
+                        </div>
+                      )}
+                      <div className={`px-3 pb-2 flex justify-end`}>
+                        <span className={`text-xs whitespace-nowrap ${isOwn ? 'opacity-60' : 'opacity-70'}`}>
+                          {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-end gap-2">
+                      <p className="flex-1 min-w-0">{message.content}</p>
+                      <span className={`text-xs whitespace-nowrap ml-auto ${isOwn ? 'opacity-60' : 'opacity-70'}`}>
+                        {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Reply icon that appears during swipe */}
+                  {swipedMessageId === message._id && Math.abs(swipeOffset) > 20 && selectedMessages.size === 0 && (
+                    <div 
+                      className={`absolute top-1/2 -translate-y-1/2 ${isOwn ? '-left-10' : '-right-10'}`}
+                      style={{ opacity: Math.min(Math.abs(swipeOffset) / 60, 1) }}
+                    >
+                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                      </svg>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -324,25 +707,93 @@ export default function ChatPage() {
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Reply Preview */}
+        {replyingTo && (
+          <div className="bg-black/40 backdrop-blur-md border-t border-white/10 px-4 py-2 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+                <span className="text-xs text-gray-400">
+                  Replying to {replyingTo.sender === currentUser?.id ? 'yourself' : chatUser?.displayName || chatUser?.name}
+                </span>
+              </div>
+              <p className="text-sm text-white truncate">{replyingTo.content}</p>
+            </div>
+            <button
+              onClick={() => setReplyingTo(null)}
+              className="text-gray-400 hover:text-white"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {/* Image Preview */}
+        {imagePreview && (
+          <div className="bg-black/40 backdrop-blur-md border-t border-white/10 p-4">
+            <div className="relative inline-block">
+              <Image
+                src={imagePreview}
+                alt="Preview"
+                width={150}
+                height={150}
+                className="rounded-lg object-cover"
+              />
+              <button
+                onClick={handleRemoveImage}
+                className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 rounded-full flex items-center justify-center hover:bg-red-700 transition"
+              >
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Input */}
         <div className="bg-black/40 backdrop-blur-md border-t border-white/10 p-4">
           <div className="flex items-center gap-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600 transition"
+            >
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </button>
             <input
               type="text"
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
-              className="flex-1 bg-black/40 backdrop-blur-md text-white rounded-full px-6 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 border border-white/10 placeholder-gray-400"
+              disabled={uploadingImage}
+              className="flex-1 bg-black/40 backdrop-blur-md text-white rounded-full px-6 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 border border-white/10 placeholder-gray-400 disabled:opacity-50"
             />
             <button
               onClick={handleSendMessage}
-              disabled={sending || !newMessage.trim()}
+              disabled={sending || uploadingImage || (!newMessage.trim() && !selectedImage)}
               className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-              </svg>
+              {uploadingImage ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              ) : (
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                </svg>
+              )}
             </button>
           </div>
         </div>
