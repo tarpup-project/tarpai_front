@@ -26,21 +26,26 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [isHydrated, setIsHydrated] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showAppearanceModal, setShowAppearanceModal] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+  const [showFollowersModal, setShowFollowersModal] = useState(false);
+  const [showFollowingModal, setShowFollowingModal] = useState(false);
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [showAddLinkModal, setShowAddLinkModal] = useState(false);
   const [links, setLinks] = useState<Link[]>([]);
-  const [backgrounds, setBackgrounds] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [followers, setFollowers] = useState<any[]>([]);
+  const [following, setFollowing] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [selectedBackground, setSelectedBackground] = useState<string>('');
-  const [uploadingBackground, setUploadingBackground] = useState(false);
   const [newLinkTitle, setNewLinkTitle] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const [addingLink, setAddingLink] = useState(false);
+  const [searchFollowers, setSearchFollowers] = useState('');
+  const [searchFollowing, setSearchFollowing] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [selectedFollowers, setSelectedFollowers] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const backgroundInputRef = useRef<HTMLInputElement>(null);
 
   // Edit form state
   const [displayName, setDisplayName] = useState('');
@@ -69,28 +74,25 @@ export default function DashboardPage() {
     try {
       console.log('Fetching follow counts and user data...');
       
-      // Fetch follow counts, links, backgrounds, and notifications
-      const [followersRes, followingRes, linksRes, backgroundsRes, notificationsRes] = await Promise.all([
+      // Fetch follow counts, links, and notifications
+      const [followersRes, followingRes, linksRes, notificationsRes] = await Promise.all([
         api.get('/follows/followers'),
         api.get('/follows/following'),
         api.get('/users/links/my'),
-        api.get('/appearance/backgrounds'),
         api.get('/notifications'),
       ]);
       setFollowersCount(followersRes.data.followers?.length || 0);
       setFollowingCount(followingRes.data.following?.length || 0);
+      setFollowers(followersRes.data.followers || []);
+      setFollowing(followingRes.data.following || []);
       setLinks(linksRes.data.links || []);
-      setBackgrounds(backgroundsRes.data.backgrounds || []);
+      
+      console.log('Notifications response:', notificationsRes.data);
       setNotifications(notificationsRes.data.notifications || []);
       
       // Count unread notifications
       const unread = notificationsRes.data.notifications?.filter((n: any) => !n.isRead).length || 0;
       setUnreadCount(unread);
-      
-      // Set current background as selected
-      if (background) {
-        setSelectedBackground(background);
-      }
       
       // Optionally refresh user profile data
       try {
@@ -232,67 +234,8 @@ export default function DashboardPage() {
     }
   };
 
-  const handleOpenAppearance = async () => {
-    setShowAppearanceModal(true);
-    
-    // Load currently selected background from localStorage
-    const currentBg = localStorage.getItem('selectedBackground');
-    if (currentBg) {
-      setSelectedBackground(currentBg);
-    }
-    
-    try {
-      const response = await api.get('/appearance/backgrounds');
-      setBackgrounds(response.data.backgrounds || []);
-    } catch (error) {
-      console.error('Failed to fetch backgrounds:', error);
-    }
-  };
-
-  const handleSelectBackground = (backgroundUrl: string) => {
-    setSelectedBackground(backgroundUrl);
-    // Save to localStorage for persistence
-    localStorage.setItem('selectedBackground', backgroundUrl);
-    toast.success('Background selected!');
-    // Force refresh the background hook
-    window.location.reload();
-  };
-
-  const handleUploadBackground = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadingBackground(true);
-    try {
-      // Create FormData for background upload
-      const formData = new FormData();
-      formData.append('background', file);
-
-      // Upload using the dedicated background upload endpoint
-      const uploadResponse = await api.post('/appearance/backgrounds/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      const imageUrl = uploadResponse.data.background.url;
-
-      toast.success('Background uploaded successfully!');
-
-      // Refresh backgrounds
-      const response = await api.get('/appearance/backgrounds');
-      setBackgrounds(response.data.backgrounds || []);
-
-      // Automatically select the newly uploaded background
-      setSelectedBackground(imageUrl);
-      localStorage.setItem('selectedBackground', imageUrl);
-      
-      // Force refresh to apply new background
-      window.location.reload();
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      toast.error(error.response?.data?.message || 'Failed to upload background');
-    } finally {
-      setUploadingBackground(false);
-    }
+  const handleOpenAppearance = () => {
+    router.push('/appearance');
   };
 
   const handleOpenNotifications = () => {
@@ -315,6 +258,92 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
     }
+  };
+
+  const handleNotificationClick = async (notification: any) => {
+    console.log('Notification clicked:', notification);
+    console.log('Action URL:', notification.actionUrl);
+    console.log('Is read:', notification.isRead);
+    
+    // Mark as read if unread
+    if (!notification.isRead) {
+      console.log('Marking as read...');
+      await handleMarkAsRead(notification._id);
+    }
+
+    // Close the modal
+    console.log('Closing modal...');
+    setShowNotificationsModal(false);
+
+    // Navigate based on notification type and actionUrl
+    let targetUrl = notification.actionUrl;
+    
+    // If no actionUrl, construct it based on notification type
+    if (!targetUrl && notification.sender) {
+      if (notification.type === 'chat_message') {
+        targetUrl = `/chat/${notification.sender._id || notification.sender}`;
+        console.log('Constructed chat URL:', targetUrl);
+      } else if (notification.type === 'follow') {
+        const username = notification.sender.username || notification.sender._id || notification.sender;
+        targetUrl = `/profile/${username}`;
+        console.log('Constructed profile URL:', targetUrl);
+      }
+    }
+    
+    if (targetUrl) {
+      console.log('Navigating to:', targetUrl);
+      router.push(targetUrl);
+    } else {
+      console.log('No action URL found and could not construct one');
+    }
+  };
+
+  const handleSendBroadcast = async () => {
+    if (!broadcastMessage.trim()) {
+      toast.error('Please enter a message');
+      return;
+    }
+
+    setSendingBroadcast(true);
+    try {
+      if (selectedFollowers.length > 0) {
+        // Send to selected followers
+        await api.post('/broadcasts/selected', {
+          message: broadcastMessage,
+          userIds: selectedFollowers,
+        });
+      } else {
+        // Send to all followers
+        await api.post('/broadcasts', {
+          message: broadcastMessage,
+          recipientType: 'followers',
+        });
+      }
+
+      toast.success('Broadcast sent successfully!');
+      setBroadcastMessage('');
+      setSelectedFollowers([]);
+      setShowBroadcastModal(false);
+      setShowFollowersModal(false);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to send broadcast');
+    } finally {
+      setSendingBroadcast(false);
+    }
+  };
+
+  const toggleFollowerSelection = (followerId: string) => {
+    setSelectedFollowers(prev => {
+      if (prev.includes(followerId)) {
+        return prev.filter(id => id !== followerId);
+      } else {
+        return [...prev, followerId];
+      }
+    });
+  };
+
+  const handleOpenBroadcast = () => {
+    setShowBroadcastModal(true);
   };
 
   const getNotificationIcon = (type: string) => {
@@ -360,49 +389,6 @@ export default function DashboardPage() {
             </svg>
           </div>
         );
-    }
-  };
-
-  const handleBackgroundSelect = (bgUrl: string) => {
-    setSelectedBackground(bgUrl);
-    // Reload page to apply new background
-    window.location.reload();
-  };
-
-  const handleBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadingBackground(true);
-    try {
-      const formData = new FormData();
-      formData.append('avatar', file);
-
-      // Upload to get URL (reusing avatar upload endpoint)
-      const uploadRes = await api.post('/users/profile/avatar', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      const imageUrl = uploadRes.data.user.avatar;
-
-      // Add as user background
-      await api.post('/appearance/backgrounds', {
-        url: imageUrl,
-        name: 'My Background',
-        thumbnail: imageUrl,
-      });
-
-      toast.success('Background uploaded successfully!');
-
-      // Refresh backgrounds
-      const backgroundsRes = await api.get('/appearance/backgrounds');
-      setBackgrounds(backgroundsRes.data.backgrounds || []);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to upload background');
-    } finally {
-      setUploadingBackground(false);
     }
   };
 
@@ -454,9 +440,8 @@ export default function DashboardPage() {
               onClick={handleOpenAppearance}
               className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center hover:bg-black/50 transition"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M17.5,12A1.5,1.5 0 0,1 16,10.5A1.5,1.5 0 0,1 17.5,9A1.5,1.5 0 0,1 19,10.5A1.5,1.5 0 0,1 17.5,12M14.5,8A1.5,1.5 0 0,1 13,6.5A1.5,1.5 0 0,1 14.5,5A1.5,1.5 0 0,1 16,6.5A1.5,1.5 0 0,1 14.5,8M9.5,8A1.5,1.5 0 0,1 8,6.5A1.5,1.5 0 0,1 9.5,5A1.5,1.5 0 0,1 11,6.5A1.5,1.5 0 0,1 9.5,8M6.5,12A1.5,1.5 0 0,1 5,10.5A1.5,1.5 0 0,1 6.5,9A1.5,1.5 0 0,1 8,10.5A1.5,1.5 0 0,1 6.5,12M12,3A9,9 0 0,0 3,12A9,9 0 0,0 12,21A1.5,1.5 0 0,0 13.5,19.5C13.5,19.11 13.35,18.76 13.11,18.5C12.88,18.23 12.73,17.88 12.73,17.5A1.5,1.5 0 0,1 14.23,16H16A5,5 0 0,0 21,11C21,6.58 16.97,3 12,3Z" />
               </svg>
             </button>
             <button 
@@ -523,15 +508,21 @@ export default function DashboardPage() {
 
           {/* Followers/Following */}
           <div className="flex gap-8 mb-8">
-            <div className="text-center">
+            <button 
+              onClick={() => setShowFollowersModal(true)}
+              className="text-center hover:opacity-80 transition"
+            >
               <div className="text-3xl font-bold">{followersCount.toLocaleString()}</div>
               <div className="text-gray-300 text-sm uppercase tracking-wide">Followers</div>
-            </div>
+            </button>
             <div className="w-px bg-white/20"></div>
-            <div className="text-center">
+            <button 
+              onClick={() => setShowFollowingModal(true)}
+              className="text-center hover:opacity-80 transition"
+            >
               <div className="text-3xl font-bold">{followingCount.toLocaleString()}</div>
               <div className="text-gray-300 text-sm uppercase tracking-wide">Following</div>
-            </div>
+            </button>
           </div>
 
           {/* Add New Link Button */}
@@ -820,9 +811,9 @@ export default function DashboardPage() {
                   {notifications.map((notification) => (
                     <div
                       key={notification._id}
-                      onClick={() => !notification.isRead && handleMarkAsRead(notification._id)}
+                      onClick={() => handleNotificationClick(notification)}
                       className={`p-3 rounded-xl cursor-pointer transition ${
-                        notification.isRead ? 'bg-gray-50' : 'bg-blue-50'
+                        notification.isRead ? 'bg-gray-50 hover:bg-gray-100' : 'bg-blue-50 hover:bg-blue-100'
                       }`}
                     >
                       <div className="flex gap-3">
@@ -836,9 +827,9 @@ export default function DashboardPage() {
                           </div>
                           <p className="text-xs text-gray-600 mb-2">{notification.message}</p>
                           {notification.actionUrl && (
-                            <button className="text-xs font-medium text-black bg-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-300 transition">
-                              {notification.actionText || 'View'}
-                            </button>
+                            <span className="text-xs font-medium text-black bg-gray-200 px-3 py-1.5 rounded-lg inline-block">
+                              {notification.actionLabel || 'View'}
+                            </span>
                           )}
                           {!notification.isRead && (
                             <div className="w-2 h-2 bg-blue-500 rounded-full absolute right-4 top-1/2 -translate-y-1/2"></div>
@@ -854,78 +845,283 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Appearance Settings Modal */}
-      {showAppearanceModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center px-6">
-          <div className="bg-white rounded-2xl p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto relative">
-            <button
-              onClick={() => setShowAppearanceModal(false)}
-              className="absolute top-6 right-6 text-gray-400 hover:text-gray-900"
-            >
-              ✕
-            </button>
-
-            <h2 className="text-2xl font-bold text-black mb-6">Appearance Settings</h2>
-
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-black mb-4">Profile Background</h3>
-              
-              <div className="grid grid-cols-2 gap-4">
-                {/* Upload Button */}
+      {/* Followers Modal */}
+      {showFollowersModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowFollowersModal(false)}>
+          <div 
+            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between mb-1">
+                <div>
+                  <h2 className="text-2xl font-bold text-black">Followers</h2>
+                  <p className="text-sm text-gray-500">{followersCount.toLocaleString()} people</p>
+                </div>
                 <button
-                  onClick={() => backgroundInputRef.current?.click()}
-                  disabled={uploadingBackground}
-                  className="aspect-[3/4] border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => setShowFollowersModal(false)}
+                  className="text-gray-400 hover:text-gray-900"
                 >
-                  {uploadingBackground ? (
-                    <>
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400 mb-2"></div>
-                      <span className="text-sm text-gray-500">Uploading...</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-8 h-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                      <span className="text-sm text-gray-500">Choose from device</span>
-                    </>
-                  )}
+                  ✕
                 </button>
-                <input
-                  ref={backgroundInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleUploadBackground}
-                  className="hidden"
-                />
-
-                {/* Background Images */}
-                {backgrounds.map((bg) => (
-                  <button
-                    key={bg._id}
-                    onClick={() => handleSelectBackground(bg.url)}
-                    className={`aspect-[3/4] rounded-xl overflow-hidden border-4 transition ${
-                      selectedBackground === bg.url ? 'border-blue-500' : 'border-transparent'
-                    }`}
-                  >
-                    <Image
-                      src={bg.thumbnail || bg.url}
-                      alt={bg.name}
-                      width={200}
-                      height={267}
-                      className="w-full h-full object-cover"
-                    />
-                  </button>
-                ))}
               </div>
             </div>
 
-            <button
-              onClick={() => setShowAppearanceModal(false)}
-              className="w-full bg-black text-white py-3 rounded-full font-semibold hover:bg-gray-800 transition"
-            >
-              Done
-            </button>
+            {/* Broadcast Button */}
+            <div className="px-6 pt-4">
+              <button 
+                onClick={handleOpenBroadcast}
+                className="w-full bg-black text-white py-4 rounded-2xl font-semibold hover:bg-gray-800 transition flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                </svg>
+                {selectedFollowers.length > 0 
+                  ? `Broadcast to ${selectedFollowers.length} Follower${selectedFollowers.length > 1 ? 's' : ''}`
+                  : 'Broadcast to All Followers'
+                }
+              </button>
+            </div>
+
+            {/* Search */}
+            <div className="px-6 py-4">
+              <div className="relative">
+                <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search followers"
+                  value={searchFollowers}
+                  onChange={(e) => setSearchFollowers(e.target.value)}
+                  className="w-full bg-gray-100 rounded-xl pl-12 pr-4 py-3 text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                />
+              </div>
+            </div>
+
+            {/* Followers List */}
+            <div className="flex-1 overflow-y-auto px-6 pb-6">
+              {followers
+                .filter(follower => 
+                  follower.name?.toLowerCase().includes(searchFollowers.toLowerCase()) ||
+                  follower.username?.toLowerCase().includes(searchFollowers.toLowerCase())
+                )
+                .map((follower) => (
+                  <div key={follower._id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+                    <div className="flex items-center gap-3 flex-1">
+                      {/* Checkbox */}
+                      <button
+                        onClick={() => toggleFollowerSelection(follower._id)}
+                        className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition ${
+                          selectedFollowers.includes(follower._id)
+                            ? 'bg-blue-600 border-blue-600'
+                            : 'border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        {selectedFollowers.includes(follower._id) && (
+                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </button>
+                      
+                      <Image
+                        src={follower.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
+                        alt={follower.name}
+                        width={48}
+                        height={48}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                      <div>
+                        <div className="font-semibold text-black">{follower.displayName || follower.name}</div>
+                        {follower.username && (
+                          <div className="text-sm text-gray-500">@{follower.username}</div>
+                        )}
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        if (follower.username) {
+                          setShowFollowersModal(false);
+                          router.push(`/profile/${follower.username}`);
+                        } else {
+                          toast.error('User has no username');
+                        }
+                      }}
+                      className="text-blue-600 font-medium text-sm hover:text-blue-700"
+                    >
+                      View
+                    </button>
+                  </div>
+                ))}
+              {followers.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">No followers yet</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Following Modal */}
+      {showFollowingModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowFollowingModal(false)}>
+          <div 
+            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between mb-1">
+                <div>
+                  <h2 className="text-2xl font-bold text-black">Following</h2>
+                  <p className="text-sm text-gray-500">{followingCount.toLocaleString()} people</p>
+                </div>
+                <button
+                  onClick={() => setShowFollowingModal(false)}
+                  className="text-gray-400 hover:text-gray-900"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Search */}
+            <div className="px-6 py-4">
+              <div className="relative">
+                <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search following"
+                  value={searchFollowing}
+                  onChange={(e) => setSearchFollowing(e.target.value)}
+                  className="w-full bg-gray-100 rounded-xl pl-12 pr-4 py-3 text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                />
+              </div>
+            </div>
+
+            {/* Following List */}
+            <div className="flex-1 overflow-y-auto px-6 pb-6">
+              {following
+                .filter(user => 
+                  user.name?.toLowerCase().includes(searchFollowing.toLowerCase()) ||
+                  user.username?.toLowerCase().includes(searchFollowing.toLowerCase())
+                )
+                .map((user) => (
+                  <div key={user._id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+                    <div className="flex items-center gap-3">
+                      <Image
+                        src={user.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
+                        alt={user.name}
+                        width={48}
+                        height={48}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                      <div>
+                        <div className="font-semibold text-black">{user.displayName || user.name}</div>
+                        {user.username && (
+                          <div className="text-sm text-gray-500">@{user.username}</div>
+                        )}
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        if (user.username) {
+                          setShowFollowingModal(false);
+                          router.push(`/profile/${user.username}`);
+                        } else {
+                          toast.error('User has no username');
+                        }
+                      }}
+                      className="text-blue-600 font-medium text-sm hover:text-blue-700"
+                    >
+                      View
+                    </button>
+                  </div>
+                ))}
+              {following.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">Not following anyone yet</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Broadcast Modal */}
+      {showBroadcastModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowBroadcastModal(false)}>
+          <div 
+            className="bg-white rounded-t-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setShowBroadcastModal(false)}
+                  className="text-gray-600 hover:text-gray-900"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <h2 className="text-xl font-bold text-black">New Broadcast</h2>
+              </div>
+            </div>
+
+            {/* To Field */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-600 font-medium">To:</span>
+                <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
+                  {selectedFollowers.length > 0 
+                    ? `${selectedFollowers.length} Follower${selectedFollowers.length > 1 ? 's' : ''}`
+                    : `All Followers (${followersCount.toLocaleString()})`
+                  }
+                </span>
+              </div>
+            </div>
+
+            {/* Message Input */}
+            <div className="flex-1 p-6">
+              <textarea
+                value={broadcastMessage}
+                onChange={(e) => setBroadcastMessage(e.target.value)}
+                maxLength={500}
+                placeholder="What's on your mind? This message will be sent to all your followers."
+                className="w-full h-full min-h-[300px] text-black placeholder-gray-400 focus:outline-none resize-none text-lg"
+              />
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm text-gray-500">
+                  {broadcastMessage.length}/500
+                </span>
+              </div>
+              
+              <button
+                onClick={handleSendBroadcast}
+                disabled={sendingBroadcast || !broadcastMessage.trim()}
+                className="w-full bg-gray-800 text-white py-4 rounded-2xl font-semibold hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+                {sendingBroadcast ? 'Sending...' : 'Send Broadcast'}
+              </button>
+              
+              <p className="text-xs text-gray-500 text-center mt-3">
+                Followers will receive a notification. Replies are disabled.
+              </p>
+            </div>
           </div>
         </div>
       )}
