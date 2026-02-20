@@ -45,6 +45,14 @@ export default function DashboardPage() {
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
   const [selectedFollowers, setSelectedFollowers] = useState<string[]>([]);
+  
+  // Search for friends state
+  const [followingModalTab, setFollowingModalTab] = useState<'following' | 'search'>('following');
+  const [searchUsers, setSearchUsers] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [usersLoaded, setUsersLoaded] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Edit form state
@@ -346,6 +354,91 @@ export default function DashboardPage() {
     setShowBroadcastModal(true);
   };
 
+  const searchForUsers = async () => {
+    setSearchLoading(true);
+    try {
+      // Always load all users since we're doing client-side filtering
+      const response = await api.get('/users');
+      
+      // Get current following IDs
+      const followingIds = following.map(f => f._id || f.id);
+      
+      // Filter out current user and users already being followed
+      const filteredUsers = response.data.filter((u: any) => {
+        const userId = u.id || u._id;
+        const isCurrentUser = userId === user?.id;
+        const isAlreadyFollowing = followingIds.includes(userId);
+        
+        return !isCurrentUser && !isAlreadyFollowing;
+      });
+      
+      setSearchUsers(filteredUsers);
+      setUsersLoaded(true);
+    } catch (error) {
+      console.error('Failed to search users:', error);
+      toast.error('Failed to search users');
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  // Load all users when switching to search tab (initial load only)
+  useEffect(() => {
+    if (followingModalTab === 'search' && showFollowingModal && !usersLoaded) {
+      searchForUsers();
+    }
+  }, [followingModalTab, showFollowingModal, usersLoaded]);
+
+  const handleFollowUser = async (userId: string) => {
+    if (!userId) {
+      toast.error('Invalid user ID');
+      return;
+    }
+
+    try {
+      await api.post(`/follows/${userId}`);
+      toast.success('User followed successfully!');
+      
+      // Refresh following list
+      const followingRes = await api.get('/follows/following');
+      const newFollowing = followingRes.data.following || [];
+      setFollowing(newFollowing);
+      setFollowingCount(newFollowing.length);
+      
+      // Remove the followed user from search results immediately
+      setSearchUsers(prev => prev.filter(u => {
+        const userIdInList = u.id || u._id;
+        return userIdInList !== userId;
+      }));
+    } catch (error: any) {
+      console.error('Follow error:', error);
+      toast.error(error.response?.data?.message || 'Failed to follow user');
+    }
+  };
+
+  const handleUnfollowUser = async (userId: string) => {
+    try {
+      await api.delete(`/follows/${userId}`);
+      toast.success('User unfollowed successfully!');
+      
+      // Refresh following list
+      const followingRes = await api.get('/follows/following');
+      const newFollowing = followingRes.data.following || [];
+      setFollowing(newFollowing);
+      setFollowingCount(newFollowing.length);
+      
+      // If we're on the search tab, refresh the search results to include the unfollowed user
+      if (followingModalTab === 'search') {
+        // Small delay to ensure following state is updated
+        setTimeout(() => {
+          searchForUsers();
+        }, 100);
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to unfollow user');
+    }
+  };
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'message':
@@ -517,7 +610,13 @@ export default function DashboardPage() {
             </button>
             <div className="w-px bg-white/20"></div>
             <button 
-              onClick={() => setShowFollowingModal(true)}
+              onClick={() => {
+                setFollowingModalTab('following');
+                setSearchQuery('');
+                setSearchUsers([]);
+                setUsersLoaded(false);
+                setShowFollowingModal(true);
+              }}
               className="text-center hover:opacity-80 transition"
             >
               <div className="text-3xl font-bold">{followingCount.toLocaleString()}</div>
@@ -973,23 +1072,70 @@ export default function DashboardPage() {
 
       {/* Following Modal */}
       {showFollowingModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowFollowingModal(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => {
+          setShowFollowingModal(false);
+          setUsersLoaded(false);
+          setSearchQuery('');
+          setSearchUsers([]);
+        }}>
           <div 
             className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-2xl font-bold text-black">Following</h2>
-                  <p className="text-sm text-gray-500">{followingCount.toLocaleString()} people</p>
+                  <h2 className="text-2xl font-bold text-black">
+                    {followingModalTab === 'following' ? 'Following' : 'Search for Friends'}
+                  </h2>
+                  <p className="text-sm text-gray-500">
+                    {followingModalTab === 'following' 
+                      ? `${followingCount.toLocaleString()} people` 
+                      : 'Find new people to follow'
+                    }
+                  </p>
                 </div>
                 <button
-                  onClick={() => setShowFollowingModal(false)}
+                  onClick={() => {
+                    setShowFollowingModal(false);
+                    setUsersLoaded(false);
+                    setSearchQuery('');
+                    setSearchUsers([]);
+                  }}
                   className="text-gray-400 hover:text-gray-900"
                 >
                   ✕
+                </button>
+              </div>
+
+              {/* Tabs */}
+              <div className="flex gap-2 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => {
+                    setFollowingModalTab('following');
+                    setUsersLoaded(false);
+                  }}
+                  className={`flex-1 py-2 px-4 rounded-md font-medium transition ${
+                    followingModalTab === 'following' 
+                      ? 'bg-white text-black shadow-sm' 
+                      : 'text-gray-600 hover:text-black'
+                  }`}
+                >
+                  Following
+                </button>
+                <button
+                  onClick={() => {
+                    setFollowingModalTab('search');
+                    setUsersLoaded(false);
+                  }}
+                  className={`flex-1 py-2 px-4 rounded-md font-medium transition ${
+                    followingModalTab === 'search' 
+                      ? 'bg-white text-black shadow-sm' 
+                      : 'text-gray-600 hover:text-black'
+                  }`}
+                >
+                  Search Friends
                 </button>
               </div>
             </div>
@@ -1002,57 +1148,147 @@ export default function DashboardPage() {
                 </svg>
                 <input
                   type="text"
-                  placeholder="Search following"
-                  value={searchFollowing}
-                  onChange={(e) => setSearchFollowing(e.target.value)}
+                  placeholder={followingModalTab === 'following' ? 'Search following' : 'Search for users'}
+                  value={followingModalTab === 'following' ? searchFollowing : searchQuery}
+                  onChange={(e) => {
+                    if (followingModalTab === 'following') {
+                      setSearchFollowing(e.target.value);
+                    } else {
+                      setSearchQuery(e.target.value);
+                    }
+                  }}
                   className="w-full bg-gray-100 rounded-xl pl-12 pr-4 py-3 text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
                 />
               </div>
             </div>
 
-            {/* Following List */}
+            {/* Content */}
             <div className="flex-1 overflow-y-auto px-6 pb-6">
-              {following
-                .filter(user => 
-                  user.name?.toLowerCase().includes(searchFollowing.toLowerCase()) ||
-                  user.username?.toLowerCase().includes(searchFollowing.toLowerCase())
-                )
-                .map((user) => (
-                  <div key={user._id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
-                    <div className="flex items-center gap-3">
-                      <Image
-                        src={user.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
-                        alt={user.name}
-                        width={48}
-                        height={48}
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
-                      <div>
-                        <div className="font-semibold text-black">{user.displayName || user.name}</div>
-                        {user.username && (
-                          <div className="text-sm text-gray-500">@{user.username}</div>
-                        )}
+              {followingModalTab === 'following' ? (
+                // Following List
+                <>
+                  {following
+                    .filter(user => 
+                      user.name?.toLowerCase().includes(searchFollowing.toLowerCase()) ||
+                      user.username?.toLowerCase().includes(searchFollowing.toLowerCase())
+                    )
+                    .map((user) => (
+                      <div key={user._id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+                        <div className="flex items-center gap-3">
+                          <Image
+                            src={user.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
+                            alt={user.name}
+                            width={48}
+                            height={48}
+                            className="w-12 h-12 rounded-full object-cover"
+                          />
+                          <div>
+                            <div className="font-semibold text-black">{user.displayName || user.name}</div>
+                            {user.username && (
+                              <div className="text-sm text-gray-500">@{user.username}</div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => handleUnfollowUser(user._id)}
+                            className="text-red-600 font-medium text-sm hover:text-red-700 px-3 py-1 border border-red-200 rounded-lg hover:bg-red-50"
+                          >
+                            Unfollow
+                          </button>
+                          <button 
+                            onClick={() => {
+                              if (user.username) {
+                                setShowFollowingModal(false);
+                                router.push(`/profile/${user.username}`);
+                              } else {
+                                toast.error('User has no username');
+                              }
+                            }}
+                            className="text-blue-600 font-medium text-sm hover:text-blue-700 px-3 py-1 border border-blue-200 rounded-lg hover:bg-blue-50"
+                          >
+                            View
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  {following.length === 0 && (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500">Not following anyone yet</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                // Search Results
+                <>
+                  {searchLoading && (
+                    <div className="text-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+                      <p className="text-gray-500 mt-2">Searching...</p>
+                    </div>
+                  )}
+                  {!searchLoading && searchQuery && searchUsers
+                    .filter(user => 
+                      user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      user.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      user.displayName?.toLowerCase().includes(searchQuery.toLowerCase())
+                    ).length === 0 && searchUsers.length > 0 && (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500">No users found matching "{searchQuery}"</p>
+                    </div>
+                  )}
+                  {!searchLoading && searchUsers.length === 0 && (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500">No new users to follow</p>
+                    </div>
+                  )}
+                  {searchUsers
+                    .filter(user => 
+                      user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      user.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      user.displayName?.toLowerCase().includes(searchQuery.toLowerCase())
+                    )
+                    .map((user) => (
+                    <div key={user.id || user._id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+                      <div className="flex items-center gap-3">
+                        <Image
+                          src={user.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
+                          alt={user.name}
+                          width={48}
+                          height={48}
+                          className="w-12 h-12 rounded-full object-cover"
+                        />
+                        <div>
+                          <div className="font-semibold text-black">{user.displayName || user.name}</div>
+                          {user.username && (
+                            <div className="text-sm text-gray-500">@{user.username}</div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => handleFollowUser(user.id || user._id)}
+                          className="text-blue-600 font-medium text-sm hover:text-blue-700 px-3 py-1 border border-blue-200 rounded-lg hover:bg-blue-50"
+                        >
+                          Follow
+                        </button>
+                        <button 
+                          onClick={() => {
+                            if (user.username) {
+                              setShowFollowingModal(false);
+                              router.push(`/profile/${user.username}`);
+                            } else {
+                              toast.error('User has no username');
+                            }
+                          }}
+                          className="text-gray-600 font-medium text-sm hover:text-gray-700 px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-50"
+                        >
+                          View
+                        </button>
                       </div>
                     </div>
-                    <button 
-                      onClick={() => {
-                        if (user.username) {
-                          setShowFollowingModal(false);
-                          router.push(`/profile/${user.username}`);
-                        } else {
-                          toast.error('User has no username');
-                        }
-                      }}
-                      className="text-blue-600 font-medium text-sm hover:text-blue-700"
-                    >
-                      View
-                    </button>
-                  </div>
-                ))}
-              {following.length === 0 && (
-                <div className="text-center py-12">
-                  <p className="text-gray-500">Not following anyone yet</p>
-                </div>
+                  ))}
+                </>
               )}
             </div>
           </div>

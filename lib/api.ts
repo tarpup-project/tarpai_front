@@ -22,6 +22,11 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Suppress aborted request errors during navigation
+    if (error.code === 'ERR_CANCELED' || error.name === 'AbortError') {
+      return Promise.reject(error);
+    }
+    
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       window.location.href = '/login';

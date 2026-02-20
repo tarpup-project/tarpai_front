@@ -96,7 +96,7 @@ export default function AppHeader() {
 
       // Navigate based on notification type
       if (notification.type === 'chat_message' && notification.sender?._id) {
-        router.push(`/chat/${notification.sender._id}`);
+        window.location.href = `/chat/${notification.sender._id}`;
       } else if (notification.type === 'new_follower' && notification.sender?._id) {
         router.push(`/profile/${notification.sender.username}`);
       }

@@ -11,6 +11,19 @@ export default function BottomNav() {
     return pathname === path;
   };
 
+  const handleChatNavigation = () => {
+    if (pathname === '/chats' || pathname?.startsWith('/chat/')) {
+      // If already on a chat page, reload the window
+      window.location.href = '/chats';
+    } else {
+      // If coming from another page, navigate normally but reload
+      router.push('/chats');
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
+    }
+  };
+
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-black/60 backdrop-blur-xl border-t border-white/10 z-40">
       <div className="flex justify-around items-center py-4 px-6 max-w-md mx-auto">
@@ -32,7 +45,7 @@ export default function BottomNav() {
         </button>
         
         <button 
-          onClick={() => router.push('/chats')}
+          onClick={handleChatNavigation}
           className={`flex flex-col items-center gap-1 ${
             isActive('/chats') || pathname?.startsWith('/chat/') ? 'text-white' : 'text-gray-400 hover:text-white'
           }`}

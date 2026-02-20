@@ -59,6 +59,22 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // Handle browser back/forward navigation
+    const handlePopState = () => {
+      const currentPath = window.location.pathname;
+      if (currentPath === '/chats' || currentPath.startsWith('/chat/')) {
+        window.location.reload();
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
+  useEffect(() => {
     // Wait a bit for auth store to rehydrate from localStorage
     const token = localStorage.getItem('token');
     if (!token) {
@@ -491,6 +507,10 @@ export default function ChatPage() {
     setSelectedMessages(new Set());
   };
 
+  const handleBackNavigation = () => {
+    window.location.href = '/chats';
+  };
+
   const handleReplyClick = (replyToId: string) => {
     // Find the message element and scroll to it
     const messageElement = messageRefs.current[replyToId];
@@ -566,7 +586,7 @@ export default function ChatPage() {
             <>
               {/* Normal Header */}
               <button
-                onClick={() => router.back()}
+                onClick={handleBackNavigation}
                 className="text-gray-300 hover:text-white"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
