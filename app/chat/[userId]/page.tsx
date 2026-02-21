@@ -605,7 +605,7 @@ export default function ChatPage() {
               <div className="flex-1">
                 <h2 className="font-semibold">{chatUser.displayName || chatUser.name}</h2>
                 {isOnline ? (
-                  <p className="text-xs text-green-500">Active now</p>
+                  <p className="text-xs text-gray-400">Online</p>
                 ) : (
                   <p className="text-xs text-gray-400">Offline</p>
                 )}

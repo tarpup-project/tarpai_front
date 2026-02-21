@@ -8,6 +8,8 @@ import { getLinkIcon, getLinkIconBgColor } from '@/utils/linkIcons';
 import Image from 'next/image';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+import AppHeader from '@/components/AppHeader';
+import BottomNav from '@/components/BottomNav';
 
 interface Link {
   _id: string;
@@ -26,17 +28,14 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [isHydrated, setIsHydrated] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [showFollowingModal, setShowFollowingModal] = useState(false);
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [showAddLinkModal, setShowAddLinkModal] = useState(false);
   const [links, setLinks] = useState<Link[]>([]);
-  const [notifications, setNotifications] = useState<any[]>([]);
   const [followers, setFollowers] = useState<any[]>([]);
   const [following, setFollowing] = useState<any[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [newLinkTitle, setNewLinkTitle] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const [addingLink, setAddingLink] = useState(false);
@@ -52,6 +51,12 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchLoading, setSearchLoading] = useState(false);
   const [usersLoaded, setUsersLoaded] = useState(false);
+  const [openLinkMenu, setOpenLinkMenu] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
+  const [showEditLinkModal, setShowEditLinkModal] = useState(false);
+  const [editingLink, setEditingLink] = useState<Link | null>(null);
+  const [editLinkForm, setEditLinkForm] = useState({ title: '', url: '' });
+  const [editingLinkLoading, setEditingLinkLoading] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -82,25 +87,17 @@ export default function DashboardPage() {
     try {
       console.log('Fetching follow counts and user data...');
       
-      // Fetch follow counts, links, and notifications
-      const [followersRes, followingRes, linksRes, notificationsRes] = await Promise.all([
+      // Fetch follow counts and links
+      const [followersRes, followingRes, linksRes] = await Promise.all([
         api.get('/follows/followers'),
         api.get('/follows/following'),
         api.get('/users/links/my'),
-        api.get('/notifications'),
       ]);
       setFollowersCount(followersRes.data.followers?.length || 0);
       setFollowingCount(followingRes.data.following?.length || 0);
       setFollowers(followersRes.data.followers || []);
       setFollowing(followingRes.data.following || []);
       setLinks(linksRes.data.links || []);
-      
-      console.log('Notifications response:', notificationsRes.data);
-      setNotifications(notificationsRes.data.notifications || []);
-      
-      // Count unread notifications
-      const unread = notificationsRes.data.notifications?.filter((n: any) => !n.isRead).length || 0;
-      setUnreadCount(unread);
       
       // Optionally refresh user profile data
       try {
@@ -242,68 +239,60 @@ export default function DashboardPage() {
     }
   };
 
+  const handleEditLink = (link: Link) => {
+    setEditingLink(link);
+    setEditLinkForm({ title: link.title, url: link.url });
+    setShowEditLinkModal(true);
+  };
+
+  const handleUpdateLink = async () => {
+    if (!editingLink || !editLinkForm.title || !editLinkForm.url) {
+      toast.error('Please fill in both title and URL');
+      return;
+    }
+
+    setEditingLinkLoading(true);
+    try {
+      await api.patch(`/users/links/${editingLink._id}`, {
+        title: editLinkForm.title,
+        url: editLinkForm.url,
+      });
+
+      toast.success('Link updated successfully!');
+      setShowEditLinkModal(false);
+      setEditingLink(null);
+      setEditLinkForm({ title: '', url: '' });
+
+      // Refresh links
+      const linksRes = await api.get('/users/links/my');
+      setLinks(linksRes.data.links || []);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to update link');
+    } finally {
+      setEditingLinkLoading(false);
+    }
+  };
+
+  const handleReorderLink = async (linkId: string) => {
+    try {
+      await api.patch(`/users/links/${linkId}/reorder`);
+
+      toast.success('Link moved to top!');
+
+      // Refresh links
+      const linksRes = await api.get('/users/links/my');
+      setLinks(linksRes.data.links || []);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to reorder link');
+    }
+  };
+
   const handleOpenAppearance = () => {
     router.push('/appearance');
   };
 
-  const handleOpenNotifications = () => {
-    setShowNotificationsModal(true);
-  };
-
   const handleOpenShare = async () => {
     router.push('/share-profile');
-  };
-
-  const handleMarkAsRead = async (notificationId: string) => {
-    try {
-      await api.patch(`/notifications/${notificationId}/read`);
-      
-      // Update local state
-      setNotifications(notifications.map(n => 
-        n._id === notificationId ? { ...n, isRead: true } : n
-      ));
-      setUnreadCount(Math.max(0, unreadCount - 1));
-    } catch (error) {
-      console.error('Failed to mark notification as read:', error);
-    }
-  };
-
-  const handleNotificationClick = async (notification: any) => {
-    console.log('Notification clicked:', notification);
-    console.log('Action URL:', notification.actionUrl);
-    console.log('Is read:', notification.isRead);
-    
-    // Mark as read if unread
-    if (!notification.isRead) {
-      console.log('Marking as read...');
-      await handleMarkAsRead(notification._id);
-    }
-
-    // Close the modal
-    console.log('Closing modal...');
-    setShowNotificationsModal(false);
-
-    // Navigate based on notification type and actionUrl
-    let targetUrl = notification.actionUrl;
-    
-    // If no actionUrl, construct it based on notification type
-    if (!targetUrl && notification.sender) {
-      if (notification.type === 'chat_message') {
-        targetUrl = `/chat/${notification.sender._id || notification.sender}`;
-        console.log('Constructed chat URL:', targetUrl);
-      } else if (notification.type === 'follow') {
-        const username = notification.sender.username || notification.sender._id || notification.sender;
-        targetUrl = `/profile/${username}`;
-        console.log('Constructed profile URL:', targetUrl);
-      }
-    }
-    
-    if (targetUrl) {
-      console.log('Navigating to:', targetUrl);
-      router.push(targetUrl);
-    } else {
-      console.log('No action URL found and could not construct one');
-    }
   };
 
   const handleSendBroadcast = async () => {
@@ -439,52 +428,6 @@ export default function DashboardPage() {
     }
   };
 
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'message':
-        return (
-          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-            <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-              <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-            </svg>
-          </div>
-        );
-      case 'broadcast':
-        return (
-          <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
-            <svg className="w-5 h-5 text-orange-600" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" />
-            </svg>
-          </div>
-        );
-      case 'follow':
-        return (
-          <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-            <svg className="w-5 h-5 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
-            </svg>
-          </div>
-        );
-      case 'feature':
-        return (
-          <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
-            <svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
-          </div>
-        );
-      default:
-        return (
-          <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-            <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-            </svg>
-          </div>
-        );
-    }
-  };
-
   if (!isHydrated || !user || loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -511,42 +454,8 @@ export default function DashboardPage() {
 
       {/* Content */}
       <div className="relative z-10 min-h-screen flex flex-col">
-        {/* Top Icons */}
-        <div className="flex justify-between items-start p-6">
-          <Image src="/logo.png" alt="TarpAI" width={40} height={40} className="w-10 h-10" />
-          
-          <div className="flex gap-4">
-            <button 
-              onClick={handleOpenNotifications}
-              className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center hover:bg-black/50 transition relative"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-            <button 
-              onClick={handleOpenAppearance}
-              className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center hover:bg-black/50 transition"
-            >
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M17.5,12A1.5,1.5 0 0,1 16,10.5A1.5,1.5 0 0,1 17.5,9A1.5,1.5 0 0,1 19,10.5A1.5,1.5 0 0,1 17.5,12M14.5,8A1.5,1.5 0 0,1 13,6.5A1.5,1.5 0 0,1 14.5,5A1.5,1.5 0 0,1 16,6.5A1.5,1.5 0 0,1 14.5,8M9.5,8A1.5,1.5 0 0,1 8,6.5A1.5,1.5 0 0,1 9.5,5A1.5,1.5 0 0,1 11,6.5A1.5,1.5 0 0,1 9.5,8M6.5,12A1.5,1.5 0 0,1 5,10.5A1.5,1.5 0 0,1 6.5,9A1.5,1.5 0 0,1 8,10.5A1.5,1.5 0 0,1 6.5,12M12,3A9,9 0 0,0 3,12A9,9 0 0,0 12,21A1.5,1.5 0 0,0 13.5,19.5C13.5,19.11 13.35,18.76 13.11,18.5C12.88,18.23 12.73,17.88 12.73,17.5A1.5,1.5 0 0,1 14.23,16H16A5,5 0 0,0 21,11C21,6.58 16.97,3 12,3Z" />
-              </svg>
-            </button>
-            <button 
-              onClick={handleOpenShare}
-              className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center hover:bg-black/50 transition"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-              </svg>
-            </button>
-          </div>
-        </div>
+        {/* Header */}
+        <AppHeader />
 
         {/* Profile Section */}
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
@@ -638,7 +547,10 @@ export default function DashboardPage() {
           {/* Links */}
           <div className="w-full max-w-md space-y-3">
             {links.map((link) => (
-              <div key={link._id} className="bg-white/90 backdrop-blur-md rounded-2xl p-4 flex items-center gap-4">
+              <div 
+                key={link._id} 
+                className="bg-white/90 backdrop-blur-md rounded-2xl p-4 flex items-center gap-4 relative"
+              >
                 <div className={`w-10 h-10 ${getLinkIconBgColor(link.url)} rounded-lg flex items-center justify-center`}>
                   {getLinkIcon(link.url)}
                 </div>
@@ -656,55 +568,37 @@ export default function DashboardPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
                 </a>
-                <button 
-                  onClick={() => handleDeleteLink(link._id)}
-                  className="text-gray-400 hover:text-red-600"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
+                
+                {/* Three-dot menu */}
+                <div className="relative">
+                  <button 
+                    onClick={(e) => {
+                      if (openLinkMenu === link._id) {
+                        setOpenLinkMenu(null);
+                        setMenuPosition(null);
+                      } else {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setMenuPosition({
+                          top: rect.bottom + 4,
+                          right: window.innerWidth - rect.right
+                        });
+                        setOpenLinkMenu(link._id);
+                      }
+                    }}
+                    className="text-gray-400 hover:text-gray-600 p-1"
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         </div>
 
         {/* Bottom Navigation */}
-        <div className="fixed bottom-0 left-0 right-0 bg-black/60 backdrop-blur-xl border-t border-white/10">
-          <div className="flex justify-around items-center py-4 px-6 max-w-md mx-auto">
-            <button className="flex flex-col items-center gap-1 text-white">
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-              </svg>
-              <span className="text-xs">Home</span>
-            </button>
-            <button className="flex flex-col items-center gap-1 text-gray-400 hover:text-white">
-              <Image src="/logo.png" alt="TarpAI" width={24} height={24} className="w-6 h-6" />
-              <span className="text-xs">TarpAI</span>
-            </button>
-            <button 
-              onClick={() => router.push('/chats')}
-              className="flex flex-col items-center gap-1 text-gray-400 hover:text-white"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              <span className="text-xs">Chats</span>
-            </button>
-            <button className="flex flex-col items-center gap-1 text-gray-400 hover:text-white">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-              </svg>
-              <span className="text-xs">Status</span>
-            </button>
-            <button className="flex flex-col items-center gap-1 text-gray-400 hover:text-white">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-              </svg>
-              <span className="text-xs">More</span>
-            </button>
-          </div>
-        </div>
+        <BottomNav />
       </div>
 
       {/* Edit Profile Modal */}
@@ -882,69 +776,59 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Notifications Modal */}
-      {showNotificationsModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowNotificationsModal(false)}>
-          <div 
-            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold text-black">Notifications</h2>
-                {unreadCount > 0 && (
-                  <span className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white">
-                    {unreadCount}
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={() => setShowNotificationsModal(false)}
-                className="text-gray-400 hover:text-gray-900"
-              >
-                ✕
-              </button>
-            </div>
+      {/* Edit Link Modal */}
+      {showEditLinkModal && editingLink && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center px-6">
+          <div className="bg-gray-900 rounded-2xl p-8 w-full max-w-md relative">
+            <button
+              onClick={() => {
+                setShowEditLinkModal(false);
+                setEditingLink(null);
+                setEditLinkForm({ title: '', url: '' });
+              }}
+              className="absolute top-6 right-6 text-gray-400 hover:text-white"
+            >
+              ✕
+            </button>
 
-            <div className="flex-1 overflow-y-auto p-4">
-              {notifications.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-sm text-gray-500">No more notifications</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {notifications.map((notification) => (
-                    <div
-                      key={notification._id}
-                      onClick={() => handleNotificationClick(notification)}
-                      className={`p-3 rounded-xl cursor-pointer transition ${
-                        notification.isRead ? 'bg-gray-50 hover:bg-gray-100' : 'bg-blue-50 hover:bg-blue-100'
-                      }`}
-                    >
-                      <div className="flex gap-3">
-                        {getNotificationIcon(notification.type)}
-                        <div className="flex-1">
-                          <div className="flex items-start justify-between mb-1">
-                            <h3 className="text-sm font-semibold text-black">{notification.title}</h3>
-                            <span className="text-xs text-gray-500">
-                              {new Date(notification.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <p className="text-xs text-gray-600 mb-2">{notification.message}</p>
-                          {notification.actionUrl && (
-                            <span className="text-xs font-medium text-black bg-gray-200 px-3 py-1.5 rounded-lg inline-block">
-                              {notification.actionLabel || 'View'}
-                            </span>
-                          )}
-                          {!notification.isRead && (
-                            <div className="w-2 h-2 bg-blue-500 rounded-full absolute right-4 top-1/2 -translate-y-1/2"></div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <h2 className="text-2xl font-bold mb-6">Edit Link</h2>
+
+            <div className="space-y-6">
+              <div>
+                <label htmlFor="editLinkTitle" className="block text-sm text-gray-400 mb-2">
+                  Title
+                </label>
+                <input
+                  id="editLinkTitle"
+                  type="text"
+                  value={editLinkForm.title}
+                  onChange={(e) => setEditLinkForm({ ...editLinkForm, title: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gray-600"
+                  placeholder="My Portfolio"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="editLinkUrl" className="block text-sm text-gray-400 mb-2">
+                  URL
+                </label>
+                <input
+                  id="editLinkUrl"
+                  type="url"
+                  value={editLinkForm.url}
+                  onChange={(e) => setEditLinkForm({ ...editLinkForm, url: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gray-600"
+                  placeholder="https://example.com"
+                />
+              </div>
+
+              <button
+                onClick={handleUpdateLink}
+                disabled={editingLinkLoading}
+                className="w-full bg-white text-black py-3 rounded-full font-semibold hover:bg-gray-200 transition disabled:opacity-50"
+              >
+                {editingLinkLoading ? 'Updating...' : 'Update Link'}
+              </button>
             </div>
           </div>
         </div>
@@ -1221,13 +1105,7 @@ export default function DashboardPage() {
               ) : (
                 // Search Results
                 <>
-                  {searchLoading && (
-                    <div className="text-center py-12">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-                      <p className="text-gray-500 mt-2">Searching...</p>
-                    </div>
-                  )}
-                  {!searchLoading && searchQuery && searchUsers
+                  {searchQuery && searchUsers
                     .filter(user => 
                       user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                       user.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1237,7 +1115,7 @@ export default function DashboardPage() {
                       <p className="text-gray-500">No users found matching "{searchQuery}"</p>
                     </div>
                   )}
-                  {!searchLoading && searchUsers.length === 0 && (
+                  {searchUsers.length === 0 && (
                     <div className="text-center py-12">
                       <p className="text-gray-500">No new users to follow</p>
                     </div>
@@ -1366,6 +1244,73 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Fixed Dropdown Menu for Links */}
+      {openLinkMenu && menuPosition && (
+        <>
+          {/* Backdrop to close menu */}
+          <div 
+            className="fixed inset-0 z-[999]" 
+            onClick={() => {
+              setOpenLinkMenu(null);
+              setMenuPosition(null);
+            }}
+          ></div>
+          
+          {/* Menu */}
+          <div 
+            className="fixed z-[1000] bg-white rounded-lg shadow-lg border border-gray-200 py-1 w-40"
+            style={{
+              top: `${menuPosition.top}px`,
+              right: `${menuPosition.right}px`
+            }}
+          >
+            <button
+              onClick={() => {
+                const linkId = openLinkMenu;
+                setOpenLinkMenu(null);
+                setMenuPosition(null);
+                const link = links.find(l => l._id === linkId);
+                if (link) handleEditLink(link);
+              }}
+              className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+              Edit
+            </button>
+            <button
+              onClick={() => {
+                const linkId = openLinkMenu;
+                setOpenLinkMenu(null);
+                setMenuPosition(null);
+                if (linkId) handleReorderLink(linkId);
+              }}
+              className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              Reorder
+            </button>
+            <button
+              onClick={() => {
+                const linkId = openLinkMenu;
+                setOpenLinkMenu(null);
+                setMenuPosition(null);
+                if (linkId) handleDeleteLink(linkId);
+              }}
+              className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

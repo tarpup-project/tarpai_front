@@ -25,7 +25,7 @@ export default function BottomNav() {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-black/60 backdrop-blur-xl border-t border-white/10 z-40">
+    <div className="fixed bottom-0 left-0 right-0 bg-black/60 backdrop-blur-xl border-t border-white/10 z-30">
       <div className="flex justify-around items-center py-4 px-6 max-w-md mx-auto">
         <button 
           onClick={() => router.push('/dashboard')}

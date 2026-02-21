@@ -50,6 +50,19 @@ interface Channel {
   createdAt: string;
 }
 
+interface Broadcast {
+  _id: string;
+  message: string;
+  sender: {
+    _id: string;
+    name: string;
+    displayName: string;
+    username: string;
+    avatar: string;
+  };
+  createdAt: string;
+}
+
 export default function ChatsPage() {
   const router = useRouter();
   const currentUser = useAuthStore((state) => state.user);
@@ -83,6 +96,12 @@ export default function ChatsPage() {
   });
   const [creatingChannel, setCreatingChannel] = useState(false);
   const channelFileInputRef = useRef<HTMLInputElement>(null);
+  const [receivedBroadcasts, setReceivedBroadcasts] = useState<Broadcast[]>([]);
+  const [sentBroadcasts, setSentBroadcasts] = useState<Broadcast[]>([]);
+  const [broadcastsLoading, setBroadcastsLoading] = useState(false);
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
 
   useEffect(() => {
     // Handle browser back/forward navigation
@@ -251,6 +270,51 @@ export default function ChatsPage() {
     }
   };
 
+  const fetchBroadcasts = async () => {
+    setBroadcastsLoading(true);
+    try {
+      // Fetch both received and sent broadcasts
+      const [receivedResponse, sentResponse] = await Promise.all([
+        api.get('/broadcasts/received'),
+        api.get('/broadcasts')
+      ]);
+      
+      setReceivedBroadcasts(receivedResponse.data.broadcasts || []);
+      setSentBroadcasts(sentResponse.data.broadcasts || []);
+    } catch (error) {
+      console.error('Failed to fetch broadcasts:', error);
+      toast.error('Failed to load broadcasts');
+    } finally {
+      setBroadcastsLoading(false);
+    }
+  };
+
+  const handleSendBroadcast = async () => {
+    if (!broadcastMessage.trim()) {
+      toast.error('Please enter a message');
+      return;
+    }
+
+    setSendingBroadcast(true);
+    try {
+      await api.post('/broadcasts', {
+        message: broadcastMessage,
+        recipientType: 'followers',
+      });
+
+      toast.success('Broadcast sent successfully!');
+      setBroadcastMessage('');
+      setShowBroadcastModal(false);
+      
+      // Optionally refresh broadcasts list
+      fetchBroadcasts();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to send broadcast');
+    } finally {
+      setSendingBroadcast(false);
+    }
+  };
+
   const handleCreateChannel = async () => {
     if (!channelForm.title.trim() || !channelForm.subtitle.trim() || !channelForm.avatar) {
       toast.error('Please fill in all fields and select an avatar');
@@ -343,6 +407,8 @@ export default function ChatsPage() {
   useEffect(() => {
     if (activeTab === 'channels') {
       fetchChannels();
+    } else if (activeTab === 'broadcasts') {
+      fetchBroadcasts();
     }
   }, [activeTab]);
 
@@ -604,8 +670,117 @@ export default function ChatsPage() {
           )}
 
           {activeTab === 'broadcasts' && (
-            <div className="text-center py-20">
-              <p className="text-gray-400">Broadcasts coming soon...</p>
+            <div>
+              {/* New Broadcast Button */}
+              <div 
+                onClick={() => setShowBroadcastModal(true)}
+                className="bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex items-center gap-4 hover:bg-black/60 transition cursor-pointer mb-6"
+              >
+                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-white">New Broadcast</h3>
+                  <p className="text-sm text-gray-400">Send a message to all your followers</p>
+                </div>
+              </div>
+
+              {broadcastsLoading ? (
+                <div className="flex justify-center py-20">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+                </div>
+              ) : sentBroadcasts.length === 0 && receivedBroadcasts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20">
+                  <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mb-4">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">No broadcasts yet</h3>
+                  <p className="text-gray-400 text-center">You haven't sent or received any broadcasts</p>
+                </div>
+              ) : (
+                <div className="space-y-8">
+                  {/* Sent Broadcasts Section */}
+                  {sentBroadcasts.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-4">SENT</h3>
+                      <div className="space-y-3">
+                        {sentBroadcasts.map((broadcast) => (
+                          <div
+                            key={broadcast._id}
+                            className="bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-4"
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-xs text-gray-400">
+                                {new Date(broadcast.createdAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <p className="text-white leading-relaxed mb-3">{broadcast.message}</p>
+                            <div className="flex justify-end">
+                              <span className="text-xs text-blue-400 font-medium flex items-center gap-1">
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                                Sent
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Received Broadcasts Section */}
+                  {receivedBroadcasts.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-4">RECEIVED</h3>
+                      <div className="space-y-3">
+                        {receivedBroadcasts.map((broadcast) => (
+                          <div
+                            key={broadcast._id}
+                            className="bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-4"
+                          >
+                            <div className="flex items-start gap-3 mb-3">
+                              <Image
+                                src={broadcast.sender.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
+                                alt={broadcast.sender.name}
+                                width={40}
+                                height={40}
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between mb-1">
+                                  <h3 className="font-semibold text-white">
+                                    {broadcast.sender.displayName || broadcast.sender.name}
+                                  </h3>
+                                  <span className="text-xs text-gray-400">
+                                    {new Date(broadcast.createdAt).toLocaleDateString()}
+                                  </span>
+                                </div>
+                                {broadcast.sender.username && (
+                                  <p className="text-sm text-gray-400 mb-2">@{broadcast.sender.username}</p>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-white leading-relaxed">{broadcast.message}</p>
+                            <div className="mt-3 flex justify-end">
+                              <span className="text-xs text-green-400 font-medium flex items-center gap-1">
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                                Received
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -719,6 +894,76 @@ export default function ChatsPage() {
               >
                 {creatingChannel ? 'Creating...' : 'Create Channel'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Broadcast Modal */}
+      {showBroadcastModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowBroadcastModal(false)}>
+          <div 
+            className="bg-white rounded-t-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setShowBroadcastModal(false)}
+                  className="text-gray-600 hover:text-gray-900"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <h2 className="text-xl font-bold text-black">New Broadcast</h2>
+              </div>
+            </div>
+
+            {/* To Field */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-600 font-medium">To:</span>
+                <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
+                  All Followers
+                </span>
+              </div>
+            </div>
+
+            {/* Message Input */}
+            <div className="flex-1 p-6">
+              <textarea
+                value={broadcastMessage}
+                onChange={(e) => setBroadcastMessage(e.target.value)}
+                maxLength={500}
+                placeholder="What's on your mind? This message will be sent to all your followers."
+                className="w-full h-full min-h-[300px] text-black placeholder-gray-400 focus:outline-none resize-none text-lg"
+              />
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm text-gray-500">
+                  {broadcastMessage.length}/500
+                </span>
+              </div>
+              
+              <button
+                onClick={handleSendBroadcast}
+                disabled={sendingBroadcast || !broadcastMessage.trim()}
+                className="w-full bg-gray-800 text-white py-4 rounded-2xl font-semibold hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+                {sendingBroadcast ? 'Sending...' : 'Send Broadcast'}
+              </button>
+              
+              <p className="text-xs text-gray-500 text-center mt-3">
+                Followers will receive a notification. Replies are disabled.
+              </p>
             </div>
           </div>
         </div>
