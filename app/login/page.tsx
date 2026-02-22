@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
+import { API_URL } from '@/config/api.config';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
@@ -108,7 +109,7 @@ export default function LoginPage() {
 
             <button
               type="button"
-              onClick={() => window.location.href = 'http://localhost:3000/auth/google'}
+              onClick={() => window.location.href = `${API_URL}/auth/google`}
               className="w-full bg-gray-900 border border-gray-800 text-white py-3 rounded-full font-semibold hover:bg-gray-800 transition flex items-center justify-center gap-2"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
