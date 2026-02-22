@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
+import { useTheme } from '@/hooks/useTheme';
 import Image from 'next/image';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
@@ -10,6 +11,7 @@ import toast from 'react-hot-toast';
 export default function ShareProfilePage() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
+  const { theme, bg, text, border, spinner } = useTheme();
   const [qrCode, setQrCode] = useState<string>('');
   const [profileUrl, setProfileUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -31,7 +33,7 @@ export default function ShareProfilePage() {
       ]);
 
       setQrCode(qrResponse.data.qrCode);
-      setProfileUrl(shareResponse.data.profileUrl || `${window.location.origin}/profile/${user?.username || user?.id}`);
+      setProfileUrl(shareResponse.data.profileUrl || `${window.location.origin}/${user?.username || user?.id}`);
     } catch (error) {
       console.error('Failed to fetch share data:', error);
       toast.error('Failed to load share data');
@@ -63,20 +65,20 @@ export default function ShareProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      <div className={`min-h-screen ${bg.primary} ${text.primary} flex items-center justify-center`}>
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 ${spinner}`}></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className={`min-h-screen ${bg.primary} ${text.primary}`}>
       {/* Header */}
-      <div className="sticky top-0 bg-black/80 backdrop-blur-md border-b border-white/10 z-10">
+      <div className={`sticky top-0 ${theme === 'dark' ? 'bg-black/80' : 'bg-white/80'} backdrop-blur-md border-b ${border.primary} z-10`}>
         <div className="flex items-center justify-between p-4">
           <button
             onClick={handleBack}
-            className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition"
+            className={`w-10 h-10 rounded-full ${bg.button} ${bg.buttonHover} flex items-center justify-center transition`}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -91,8 +93,8 @@ export default function ShareProfilePage() {
       <div className="p-6 max-w-md mx-auto">
         {/* QR Code Section */}
         {qrCode && (
-          <div className="bg-white rounded-2xl p-6 mb-6">
-            <div className="flex flex-col items-center">
+          <div className="mb-6 flex flex-col items-center">
+            <div className={`${theme === 'dark' ? 'bg-white' : 'bg-gray-100'} rounded-2xl p-6 shadow-lg w-fit`}>
               <Image
                 src={qrCode}
                 alt="Profile QR Code"
@@ -100,10 +102,10 @@ export default function ShareProfilePage() {
                 height={250}
                 className="w-64 h-64"
               />
-              <p className="text-sm text-gray-600 text-center mt-4">
-                Point your camera at the QR code to access profile
-              </p>
             </div>
+            <p className={`text-sm ${text.secondary} text-center mt-4`}>
+              Point your camera at the QR code to access profile
+            </p>
           </div>
         )}
 
@@ -111,9 +113,9 @@ export default function ShareProfilePage() {
         <div className="space-y-3">
           <button
             onClick={handleCopyLink}
-            className="w-full bg-white/10 hover:bg-white/20 text-white py-4 px-4 rounded-xl flex items-center gap-3 transition"
+            className={`w-full ${bg.button} ${bg.buttonHover} ${text.primary} py-4 px-4 rounded-xl flex items-center gap-3 transition`}
           >
-            <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
+            <div className={`w-10 h-10 ${bg.button} rounded-full flex items-center justify-center`}>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
@@ -133,9 +135,9 @@ export default function ShareProfilePage() {
                 toast.error('Sharing not supported on this device');
               }
             }}
-            className="w-full bg-white/10 hover:bg-white/20 text-white py-4 px-4 rounded-xl flex items-center gap-3 transition"
+            className={`w-full ${bg.button} ${bg.buttonHover} ${text.primary} py-4 px-4 rounded-xl flex items-center gap-3 transition`}
           >
-            <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
+            <div className={`w-10 h-10 ${bg.button} rounded-full flex items-center justify-center`}>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
@@ -155,9 +157,9 @@ export default function ShareProfilePage() {
               console.log('Body:', body);
               window.location.href = mailtoUrl;
             }}
-            className="w-full bg-white/10 hover:bg-white/20 text-white py-4 px-4 rounded-xl flex items-center gap-3 transition"
+            className={`w-full ${bg.button} ${bg.buttonHover} ${text.primary} py-4 px-4 rounded-xl flex items-center gap-3 transition`}
           >
-            <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
+            <div className={`w-10 h-10 ${bg.button} rounded-full flex items-center justify-center`}>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
@@ -174,9 +176,9 @@ export default function ShareProfilePage() {
                 });
               }
             }}
-            className="w-full bg-white/10 hover:bg-white/20 text-white py-4 px-4 rounded-xl flex items-center gap-3 transition"
+            className={`w-full ${bg.button} ${bg.buttonHover} ${text.primary} py-4 px-4 rounded-xl flex items-center gap-3 transition`}
           >
-            <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
+            <div className={`w-10 h-10 ${bg.button} rounded-full flex items-center justify-center`}>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
               </svg>
@@ -188,7 +190,7 @@ export default function ShareProfilePage() {
             onClick={() => {
               window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(profileUrl)}`, '_blank');
             }}
-            className="w-full bg-white/10 hover:bg-white/20 text-white py-4 px-4 rounded-xl flex items-center gap-3 transition"
+            className={`w-full ${bg.button} ${bg.buttonHover} ${text.primary} py-4 px-4 rounded-xl flex items-center gap-3 transition`}
           >
             <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
               <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -200,7 +202,7 @@ export default function ShareProfilePage() {
 
           <button
             onClick={handleDownloadQR}
-            className="w-full bg-white/10 hover:bg-white/20 text-white py-4 px-4 rounded-xl flex items-center gap-3 transition"
+            className={`w-full ${bg.button} ${bg.buttonHover} ${text.primary} py-4 px-4 rounded-xl flex items-center gap-3 transition`}
           >
             <div className="w-10 h-10 bg-orange-600 rounded-full flex items-center justify-center">
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -229,9 +231,9 @@ export default function ShareProfilePage() {
                 toast.error('Sharing not supported on this device');
               }
             }}
-            className="w-full bg-white/10 hover:bg-white/20 text-white py-4 px-4 rounded-xl flex items-center gap-3 transition"
+            className={`w-full ${bg.button} ${bg.buttonHover} ${text.primary} py-4 px-4 rounded-xl flex items-center gap-3 transition`}
           >
-            <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
+            <div className={`w-10 h-10 ${bg.button} rounded-full flex items-center justify-center`}>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L9 8m4-4v12" />
               </svg>

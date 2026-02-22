@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useBackground } from '@/hooks/useBackground';
+import { useTheme } from '@/hooks/useTheme';
 import { getLinkIcon, getLinkIconBgColor } from '@/utils/linkIcons';
 import Image from 'next/image';
 import api from '@/lib/api';
@@ -23,6 +24,7 @@ export default function DashboardPage() {
   const user = useAuthStore((state) => state.user);
   const updateUser = useAuthStore((state) => state.updateUser);
   const { background } = useBackground();
+  const { theme } = useTheme();
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -536,7 +538,7 @@ export default function DashboardPage() {
           {/* Add New Link Button */}
           <button 
             onClick={() => setShowAddLinkModal(true)}
-            className="w-full max-w-md bg-black/30 backdrop-blur-md border border-white/20 rounded-2xl py-4 px-6 flex items-center justify-center gap-2 hover:bg-black/50 transition mb-4"
+            className={`w-full max-w-md ${theme === 'dark' ? 'bg-black/30 border-white/20 hover:bg-black/50' : 'bg-white/30 border-gray-300 hover:bg-white/50'} backdrop-blur-md border rounded-2xl py-4 px-6 flex items-center justify-center gap-2 transition mb-4`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -724,20 +726,20 @@ export default function DashboardPage() {
 
       {/* Add Link Modal */}
       {showAddLinkModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center px-6">
-          <div className="bg-gray-900 rounded-2xl p-8 w-full max-w-md relative">
+        <div className={`fixed inset-0 ${theme === 'dark' ? 'bg-black/80' : 'bg-black/40'} backdrop-blur-sm z-50 flex items-center justify-center px-6`}>
+          <div className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} rounded-2xl p-8 w-full max-w-md relative`}>
             <button
               onClick={() => setShowAddLinkModal(false)}
-              className="absolute top-6 right-6 text-gray-400 hover:text-white"
+              className={`absolute top-6 right-6 ${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-black'}`}
             >
               ✕
             </button>
 
-            <h2 className="text-2xl font-bold mb-6">Add New Link</h2>
+            <h2 className={`text-2xl font-bold mb-6 ${theme === 'dark' ? 'text-white' : 'text-black'}`}>Add New Link</h2>
 
             <div className="space-y-6">
               <div>
-                <label htmlFor="linkTitle" className="block text-sm text-gray-400 mb-2">
+                <label htmlFor="linkTitle" className={`block text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} mb-2`}>
                   Title
                 </label>
                 <input
@@ -745,13 +747,13 @@ export default function DashboardPage() {
                   type="text"
                   value={newLinkTitle}
                   onChange={(e) => setNewLinkTitle(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gray-600"
+                  className={`w-full ${theme === 'dark' ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-100 border-gray-300 text-black'} border rounded-lg px-4 py-3 focus:outline-none ${theme === 'dark' ? 'focus:border-gray-600' : 'focus:border-gray-400'}`}
                   placeholder="My Portfolio"
                 />
               </div>
 
               <div>
-                <label htmlFor="linkUrl" className="block text-sm text-gray-400 mb-2">
+                <label htmlFor="linkUrl" className={`block text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} mb-2`}>
                   URL
                 </label>
                 <input
@@ -759,7 +761,7 @@ export default function DashboardPage() {
                   type="url"
                   value={newLinkUrl}
                   onChange={(e) => setNewLinkUrl(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gray-600"
+                  className={`w-full ${theme === 'dark' ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-100 border-gray-300 text-black'} border rounded-lg px-4 py-3 focus:outline-none ${theme === 'dark' ? 'focus:border-gray-600' : 'focus:border-gray-400'}`}
                   placeholder="https://example.com"
                 />
               </div>
@@ -767,7 +769,7 @@ export default function DashboardPage() {
               <button
                 onClick={handleAddLink}
                 disabled={addingLink}
-                className="w-full bg-white text-black py-3 rounded-full font-semibold hover:bg-gray-200 transition disabled:opacity-50"
+                className={`w-full ${theme === 'dark' ? 'bg-white text-black hover:bg-gray-200' : 'bg-black text-white hover:bg-gray-800'} py-3 rounded-full font-semibold transition disabled:opacity-50`}
               >
                 {addingLink ? 'Adding...' : 'Add Link'}
               </button>
@@ -836,21 +838,21 @@ export default function DashboardPage() {
 
       {/* Followers Modal */}
       {showFollowersModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowFollowersModal(false)}>
+        <div className={`fixed inset-0 ${theme === 'dark' ? 'bg-black/60' : 'bg-black/40'} backdrop-blur-sm z-50 flex items-end`} onClick={() => setShowFollowersModal(false)}>
           <div 
-            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
+            className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="p-6 border-b border-gray-200">
+            <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
               <div className="flex items-center justify-between mb-1">
                 <div>
-                  <h2 className="text-2xl font-bold text-black">Followers</h2>
-                  <p className="text-sm text-gray-500">{followersCount.toLocaleString()} people</p>
+                  <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>Followers</h2>
+                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{followersCount.toLocaleString()} people</p>
                 </div>
                 <button
                   onClick={() => setShowFollowersModal(false)}
-                  className="text-gray-400 hover:text-gray-900"
+                  className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-900'}`}
                 >
                   ✕
                 </button>
@@ -861,7 +863,7 @@ export default function DashboardPage() {
             <div className="px-6 pt-4">
               <button 
                 onClick={handleOpenBroadcast}
-                className="w-full bg-black text-white py-4 rounded-2xl font-semibold hover:bg-gray-800 transition flex items-center justify-center gap-2"
+                className={`w-full ${theme === 'dark' ? 'bg-white text-black hover:bg-gray-200' : 'bg-black text-white hover:bg-gray-800'} py-4 rounded-2xl font-semibold transition flex items-center justify-center gap-2`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
@@ -876,7 +878,7 @@ export default function DashboardPage() {
             {/* Search */}
             <div className="px-6 py-4">
               <div className="relative">
-                <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <input
@@ -884,7 +886,7 @@ export default function DashboardPage() {
                   placeholder="Search followers"
                   value={searchFollowers}
                   onChange={(e) => setSearchFollowers(e.target.value)}
-                  className="w-full bg-gray-100 rounded-xl pl-12 pr-4 py-3 text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  className={`w-full ${theme === 'dark' ? 'bg-gray-800 text-white placeholder-gray-500' : 'bg-gray-100 text-black placeholder-gray-400'} rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:ring-2 ${theme === 'dark' ? 'focus:ring-gray-600' : 'focus:ring-gray-300'}`}
                 />
               </div>
             </div>
@@ -897,7 +899,7 @@ export default function DashboardPage() {
                   follower.username?.toLowerCase().includes(searchFollowers.toLowerCase())
                 )
                 .map((follower) => (
-                  <div key={follower._id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+                  <div key={follower._id} className={`flex items-center justify-between py-3 border-b ${theme === 'dark' ? 'border-gray-800' : 'border-gray-100'} last:border-0`}>
                     <div className="flex items-center gap-3 flex-1">
                       {/* Checkbox */}
                       <button
@@ -905,7 +907,7 @@ export default function DashboardPage() {
                         className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition ${
                           selectedFollowers.includes(follower._id)
                             ? 'bg-blue-600 border-blue-600'
-                            : 'border-gray-300 hover:border-gray-400'
+                            : `${theme === 'dark' ? 'border-gray-600 hover:border-gray-500' : 'border-gray-300 hover:border-gray-400'}`
                         }`}
                       >
                         {selectedFollowers.includes(follower._id) && (
@@ -923,9 +925,9 @@ export default function DashboardPage() {
                         className="w-12 h-12 rounded-full object-cover"
                       />
                       <div>
-                        <div className="font-semibold text-black">{follower.displayName || follower.name}</div>
+                        <div className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>{follower.displayName || follower.name}</div>
                         {follower.username && (
-                          <div className="text-sm text-gray-500">@{follower.username}</div>
+                          <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>@{follower.username}</div>
                         )}
                       </div>
                     </div>
@@ -946,7 +948,7 @@ export default function DashboardPage() {
                 ))}
               {followers.length === 0 && (
                 <div className="text-center py-12">
-                  <p className="text-gray-500">No followers yet</p>
+                  <p className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>No followers yet</p>
                 </div>
               )}
             </div>
@@ -956,24 +958,24 @@ export default function DashboardPage() {
 
       {/* Following Modal */}
       {showFollowingModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => {
+        <div className={`fixed inset-0 ${theme === 'dark' ? 'bg-black/60' : 'bg-black/40'} backdrop-blur-sm z-50 flex items-end`} onClick={() => {
           setShowFollowingModal(false);
           setUsersLoaded(false);
           setSearchQuery('');
           setSearchUsers([]);
         }}>
           <div 
-            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
+            className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="p-6 border-b border-gray-200">
+            <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-2xl font-bold text-black">
+                  <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
                     {followingModalTab === 'following' ? 'Following' : 'Search for Friends'}
                   </h2>
-                  <p className="text-sm text-gray-500">
+                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                     {followingModalTab === 'following' 
                       ? `${followingCount.toLocaleString()} people` 
                       : 'Find new people to follow'
@@ -987,14 +989,14 @@ export default function DashboardPage() {
                     setSearchQuery('');
                     setSearchUsers([]);
                   }}
-                  className="text-gray-400 hover:text-gray-900"
+                  className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-900'}`}
                 >
                   ✕
                 </button>
               </div>
 
               {/* Tabs */}
-              <div className="flex gap-2 bg-gray-100 rounded-lg p-1">
+              <div className={`flex gap-2 ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'} rounded-lg p-1`}>
                 <button
                   onClick={() => {
                     setFollowingModalTab('following');
@@ -1002,8 +1004,8 @@ export default function DashboardPage() {
                   }}
                   className={`flex-1 py-2 px-4 rounded-md font-medium transition ${
                     followingModalTab === 'following' 
-                      ? 'bg-white text-black shadow-sm' 
-                      : 'text-gray-600 hover:text-black'
+                      ? `${theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-white text-black'} shadow-sm` 
+                      : `${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-black'}`
                   }`}
                 >
                   Following
@@ -1015,7 +1017,7 @@ export default function DashboardPage() {
                   }}
                   className={`flex-1 py-2 px-4 rounded-md font-medium transition ${
                     followingModalTab === 'search' 
-                      ? 'bg-white text-black shadow-sm' 
+                      ? `${theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-white text-black'} shadow-sm` 
                       : 'text-gray-600 hover:text-black'
                   }`}
                 >
@@ -1067,9 +1069,9 @@ export default function DashboardPage() {
                             className="w-12 h-12 rounded-full object-cover"
                           />
                           <div>
-                            <div className="font-semibold text-black">{user.displayName || user.name}</div>
+                            <div className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>{user.displayName || user.name}</div>
                             {user.username && (
-                              <div className="text-sm text-gray-500">@{user.username}</div>
+                              <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>@{user.username}</div>
                             )}
                           </div>
                         </div>
@@ -1137,9 +1139,9 @@ export default function DashboardPage() {
                           className="w-12 h-12 rounded-full object-cover"
                         />
                         <div>
-                          <div className="font-semibold text-black">{user.displayName || user.name}</div>
+                          <div className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>{user.displayName || user.name}</div>
                           {user.username && (
-                            <div className="text-sm text-gray-500">@{user.username}</div>
+                            <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>@{user.username}</div>
                           )}
                         </div>
                       </div>
@@ -1177,29 +1179,29 @@ export default function DashboardPage() {
       {showBroadcastModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowBroadcastModal(false)}>
           <div 
-            className="bg-white rounded-t-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-slide-up"
+            className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-slide-up`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="p-6 border-b border-gray-200">
+            <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
               <div className="flex items-center gap-4">
                 <button
                   onClick={() => setShowBroadcastModal(false)}
-                  className="text-gray-600 hover:text-gray-900"
+                  className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                <h2 className="text-xl font-bold text-black">New Broadcast</h2>
+                <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>New Broadcast</h2>
               </div>
             </div>
 
             {/* To Field */}
-            <div className="px-6 py-4 border-b border-gray-200">
+            <div className={`px-6 py-4 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
               <div className="flex items-center gap-2">
-                <span className="text-gray-600 font-medium">To:</span>
-                <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
+                <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'} font-medium`}>To:</span>
+                <span className={`${theme === 'dark' ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'} px-3 py-1 rounded-full text-sm font-medium`}>
                   {selectedFollowers.length > 0 
                     ? `${selectedFollowers.length} Follower${selectedFollowers.length > 1 ? 's' : ''}`
                     : `All Followers (${followersCount.toLocaleString()})`
@@ -1215,14 +1217,14 @@ export default function DashboardPage() {
                 onChange={(e) => setBroadcastMessage(e.target.value)}
                 maxLength={500}
                 placeholder="What's on your mind? This message will be sent to all your followers."
-                className="w-full h-full min-h-[300px] text-black placeholder-gray-400 focus:outline-none resize-none text-lg"
+                className={`w-full h-full min-h-[300px] ${theme === 'dark' ? 'text-white placeholder-gray-500 bg-transparent' : 'text-black placeholder-gray-400 bg-transparent'} focus:outline-none resize-none text-lg`}
               />
             </div>
 
             {/* Footer */}
-            <div className="p-6 border-t border-gray-200">
+            <div className={`p-6 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
               <div className="flex items-center justify-between mb-4">
-                <span className="text-sm text-gray-500">
+                <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                   {broadcastMessage.length}/500
                 </span>
               </div>
@@ -1230,7 +1232,7 @@ export default function DashboardPage() {
               <button
                 onClick={handleSendBroadcast}
                 disabled={sendingBroadcast || !broadcastMessage.trim()}
-                className="w-full bg-gray-800 text-white py-4 rounded-2xl font-semibold hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className={`w-full ${theme === 'dark' ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-800 text-white hover:bg-gray-700'} py-4 rounded-2xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -1238,7 +1240,7 @@ export default function DashboardPage() {
                 {sendingBroadcast ? 'Sending...' : 'Send Broadcast'}
               </button>
               
-              <p className="text-xs text-gray-500 text-center mt-3">
+              <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-center mt-3`}>
                 Followers will receive a notification. Replies are disabled.
               </p>
             </div>

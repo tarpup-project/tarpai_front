@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useBackground } from '@/hooks/useBackground';
+import { useTheme } from '@/hooks/useTheme';
 import Image from 'next/image';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
@@ -44,12 +45,23 @@ export default function ChannelPage() {
   const channelId = params.channelId as string;
   const currentUser = useAuthStore((state) => state.user);
   const { background } = useBackground();
+  const { theme } = useTheme();
   const [channel, setChannel] = useState<Channel | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
   const [newPostContent, setNewPostContent] = useState('');
   const [creatingPost, setCreatingPost] = useState(false);
+  const [showChannelMenu, setShowChannelMenu] = useState(false);
+  const [showEditChannelModal, setShowEditChannelModal] = useState(false);
+  const [editChannelForm, setEditChannelForm] = useState({
+    title: '',
+    subtitle: '',
+    avatar: null as File | null,
+  });
+  const [updatingChannel, setUpdatingChannel] = useState(false);
+  const channelFileInputRef = useRef<HTMLInputElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
 
   useEffect(() => {
     // Handle browser back/forward navigation
@@ -118,6 +130,12 @@ export default function ChannelPage() {
     try {
       const response = await api.get(`/channels/${channelId}`, { signal });
       setChannel(response.data);
+      // Initialize edit form with current channel data
+      setEditChannelForm({
+        title: response.data.title,
+        subtitle: response.data.subtitle,
+        avatar: null,
+      });
     } catch (error: any) {
       if (error.code === 'ERR_CANCELED' || error.name === 'AbortError') {
         return;
@@ -263,6 +281,78 @@ export default function ChannelPage() {
     }
   };
 
+  const handleEditChannel = () => {
+    setShowChannelMenu(false);
+    setShowEditChannelModal(true);
+  };
+
+  const handleDeleteChannel = async () => {
+    if (!confirm('Are you sure you want to delete this channel? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await api.delete(`/channels/${channelId}`);
+      toast.success('Channel deleted successfully');
+      window.location.href = '/chats?tab=channels';
+    } catch (error) {
+      console.error('Failed to delete channel:', error);
+      toast.error('Failed to delete channel');
+    }
+  };
+
+  const handleUpdateChannel = async () => {
+    if (!editChannelForm.title.trim() || !editChannelForm.subtitle.trim()) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    setUpdatingChannel(true);
+    try {
+      const formData = new FormData();
+      formData.append('title', editChannelForm.title);
+      formData.append('subtitle', editChannelForm.subtitle);
+      if (editChannelForm.avatar) {
+        formData.append('avatar', editChannelForm.avatar);
+      }
+
+      await api.put(`/channels/${channelId}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      // Refetch channel data to ensure we have all fields
+      await fetchChannelData();
+      
+      toast.success('Channel updated successfully!');
+      setShowEditChannelModal(false);
+      setEditChannelForm(prev => ({ ...prev, avatar: null }));
+    } catch (error) {
+      console.error('Failed to update channel:', error);
+      toast.error('Failed to update channel');
+    } finally {
+      setUpdatingChannel(false);
+    }
+  };
+
+  const handleChannelAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Image size must be less than 5MB');
+        return;
+      }
+      
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file');
+        return;
+      }
+
+      setEditChannelForm(prev => ({ ...prev, avatar: file }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -294,7 +384,7 @@ export default function ChannelPage() {
       {/* Content */}
       <div className="relative z-10 min-h-screen flex flex-col pb-20">
         {/* Header */}
-        <div className="bg-black/40 backdrop-blur-md border-b border-white/10 p-4 flex items-center gap-3">
+        <div className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border-b ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} p-4 flex items-center gap-3`}>
           <button
             onClick={handleBackNavigation}
             className="text-gray-300 hover:text-white"
@@ -317,8 +407,29 @@ export default function ChannelPage() {
             <p className="text-xs text-gray-400">{channel.subscribersCount} subscribers</p>
           </div>
 
-          {/* Subscribe/Unsubscribe Bell Button - Only show if not owner */}
-          {!channel.isOwner && (
+          {/* Three-dot menu for owner OR Subscribe bell for non-owner */}
+          {channel.isOwner ? (
+            <button
+              onClick={(e) => {
+                if (showChannelMenu) {
+                  setShowChannelMenu(false);
+                  setMenuPosition(null);
+                } else {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setMenuPosition({
+                    top: rect.bottom + 4,
+                    right: window.innerWidth - rect.right
+                  });
+                  setShowChannelMenu(true);
+                }
+              }}
+              className="p-2 rounded-full hover:bg-white/10 transition"
+            >
+              <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+              </svg>
+            </button>
+          ) : (
             <button
               onClick={handleSubscription}
               className={`p-2 rounded-full transition ${
@@ -335,7 +446,7 @@ export default function ChannelPage() {
         </div>
 
         {/* Channel Info */}
-        <div className="bg-black/40 backdrop-blur-md border-b border-white/10 p-4">
+        <div className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border-b ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} p-4`}>
           <p className="text-gray-300">{channel.subtitle}</p>
         </div>
 
@@ -353,7 +464,7 @@ export default function ChannelPage() {
               return (
                 <div
                   key={post.id}
-                  className="bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-4"
+                  className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-2xl p-4`}
                 >
                   <div className="flex items-start gap-3 mb-3">
                     <Image
@@ -407,7 +518,7 @@ export default function ChannelPage() {
           <div className="p-4">
             <button
               onClick={() => setShowCreatePostModal(true)}
-              className="w-full bg-black/40 backdrop-blur-md border border-white/20 rounded-2xl p-4 flex items-center justify-center gap-3 hover:bg-black/60 transition"
+              className={`w-full ${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/20' : 'border-white/20'} rounded-2xl p-4 flex items-center justify-center gap-3 ${theme === 'dark' ? 'hover:bg-black/60' : 'hover:bg-white/20'} transition`}
             >
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -422,15 +533,15 @@ export default function ChannelPage() {
       {showCreatePostModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowCreatePostModal(false)}>
           <div 
-            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
+            className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-6 border-b border-gray-200">
+            <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-black">Create Post</h2>
+                <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>Create Post</h2>
                 <button
                   onClick={() => setShowCreatePostModal(false)}
-                  className="text-gray-400 hover:text-gray-900"
+                  className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-900'}`}
                 >
                   ✕
                 </button>
@@ -442,21 +553,181 @@ export default function ChannelPage() {
                 value={newPostContent}
                 onChange={(e) => setNewPostContent(e.target.value)}
                 placeholder="What's on your mind?"
-                className="w-full h-32 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-black resize-none"
+                className={`w-full h-32 px-4 py-3 border ${theme === 'dark' ? 'border-gray-700 bg-gray-800 text-white placeholder-gray-400' : 'border-gray-300 bg-white text-black placeholder-gray-500'} rounded-lg focus:outline-none focus:ring-2 ${theme === 'dark' ? 'focus:ring-white' : 'focus:ring-black'} resize-none`}
               />
             </div>
 
-            <div className="p-6 border-t border-gray-200">
+            <div className={`p-6 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
               <button
                 onClick={handleCreatePost}
                 disabled={creatingPost || !newPostContent.trim()}
-                className="w-full bg-black text-white py-3 rounded-lg font-semibold hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`w-full ${theme === 'dark' ? 'bg-white text-black hover:bg-gray-200' : 'bg-black text-white hover:bg-gray-800'} py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {creatingPost ? 'Posting...' : 'Post Update'}
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Edit Channel Modal */}
+      {showEditChannelModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowEditChannelModal(false)}>
+          <div 
+            className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>Edit Channel</h2>
+                <button
+                  onClick={() => setShowEditChannelModal(false)}
+                  className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-900'}`}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-4">
+                {/* Avatar Selection */}
+                <div>
+                  <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                    Channel Avatar
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <div className={`w-16 h-16 ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'} rounded-full flex items-center justify-center overflow-hidden`}>
+                      {editChannelForm.avatar ? (
+                        <Image
+                          src={URL.createObjectURL(editChannelForm.avatar)}
+                          alt="Channel avatar preview"
+                          width={64}
+                          height={64}
+                          className="w-full h-full object-cover"
+                          unoptimized
+                        />
+                      ) : channel?.avatar ? (
+                        <Image
+                          src={channel.avatar}
+                          alt={`${channel.title || 'Channel'} avatar`}
+                          width={64}
+                          height={64}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <svg className={`w-8 h-8 ${theme === 'dark' ? 'text-gray-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      )}
+                    </div>
+                    <input
+                      ref={channelFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleChannelAvatarSelect}
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => channelFileInputRef.current?.click()}
+                      className={`px-4 py-2 ${theme === 'dark' ? 'bg-gray-800 text-gray-200 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} rounded-lg transition`}
+                    >
+                      Change Image
+                    </button>
+                  </div>
+                </div>
+
+                {/* Title */}
+                <div>
+                  <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                    Channel Title
+                  </label>
+                  <input
+                    type="text"
+                    value={editChannelForm.title}
+                    onChange={(e) => setEditChannelForm(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="My Updates"
+                    className={`w-full px-4 py-3 border ${theme === 'dark' ? 'border-gray-700 bg-gray-800 text-white placeholder-gray-500' : 'border-gray-300 bg-white text-black placeholder-gray-400'} rounded-lg focus:outline-none focus:ring-2 ${theme === 'dark' ? 'focus:ring-white' : 'focus:ring-black'}`}
+                  />
+                </div>
+
+                {/* Subtitle */}
+                <div>
+                  <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                    Channel Subtitle
+                  </label>
+                  <input
+                    type="text"
+                    value={editChannelForm.subtitle}
+                    onChange={(e) => setEditChannelForm(prev => ({ ...prev, subtitle: e.target.value }))}
+                    placeholder="Official updates from me"
+                    className={`w-full px-4 py-3 border ${theme === 'dark' ? 'border-gray-700 bg-gray-800 text-white placeholder-gray-500' : 'border-gray-300 bg-white text-black placeholder-gray-400'} rounded-lg focus:outline-none focus:ring-2 ${theme === 'dark' ? 'focus:ring-white' : 'focus:ring-black'}`}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className={`p-6 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+              <button
+                onClick={handleUpdateChannel}
+                disabled={updatingChannel || !editChannelForm.title.trim() || !editChannelForm.subtitle.trim()}
+                className={`w-full ${theme === 'dark' ? 'bg-white text-black hover:bg-gray-200' : 'bg-black text-white hover:bg-gray-800'} py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {updatingChannel ? 'Updating...' : 'Update Channel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fixed Dropdown Menu for Channel */}
+      {showChannelMenu && menuPosition && (
+        <>
+          {/* Backdrop to close menu */}
+          <div 
+            className="fixed inset-0 z-[999]" 
+            onClick={() => {
+              setShowChannelMenu(false);
+              setMenuPosition(null);
+            }}
+          ></div>
+          
+          {/* Menu */}
+          <div 
+            className={`fixed z-[1000] ${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} rounded-lg shadow-lg ${theme === 'dark' ? 'border border-gray-700' : 'border border-gray-200'} py-1 w-48`}
+            style={{
+              top: `${menuPosition.top}px`,
+              right: `${menuPosition.right}px`
+            }}
+          >
+            <button
+              onClick={() => {
+                setShowChannelMenu(false);
+                setMenuPosition(null);
+                handleEditChannel();
+              }}
+              className={`w-full px-4 py-3 text-left ${theme === 'dark' ? 'text-white hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'} flex items-center gap-3`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <span className="font-medium">Edit Channel</span>
+            </button>
+            <button
+              onClick={() => {
+                setShowChannelMenu(false);
+                setMenuPosition(null);
+                handleDeleteChannel();
+              }}
+              className={`w-full px-4 py-3 text-left text-red-500 ${theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-red-50'} flex items-center gap-3`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <span className="font-medium">Delete Channel</span>
+            </button>
+          </div>
+        </>
       )}
 
       {/* Bottom Navigation */}

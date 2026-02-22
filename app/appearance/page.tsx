@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
+import { useThemeStore } from '@/store/themeStore';
 import Image from 'next/image';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
@@ -10,6 +11,7 @@ import toast from 'react-hot-toast';
 export default function AppearancePage() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
+  const { theme, toggleTheme } = useThemeStore();
   const [backgrounds, setBackgrounds] = useState<any[]>([]);
   const [selectedBackground, setSelectedBackground] = useState<string>('');
   const [uploadingBackground, setUploadingBackground] = useState(false);
@@ -99,27 +101,44 @@ export default function AppearancePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      <div className={`min-h-screen ${theme === 'dark' ? 'bg-black text-white' : 'bg-white text-black'} flex items-center justify-center`}>
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 ${theme === 'dark' ? 'border-white' : 'border-black'}`}></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className={`min-h-screen ${theme === 'dark' ? 'bg-black text-white' : 'bg-gray-50 text-black'}`}>
       {/* Header */}
-      <div className="sticky top-0 bg-black/80 backdrop-blur-md border-b border-white/10 z-10">
+      <div className={`sticky top-0 ${theme === 'dark' ? 'bg-black/80 border-white/10' : 'bg-white/80 border-gray-200'} backdrop-blur-md border-b z-10`}>
         <div className="flex items-center justify-between p-4">
           <button
             onClick={handleBack}
-            className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition"
+            className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-200 hover:bg-gray-300'} flex items-center justify-center transition`}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <h1 className="text-xl font-bold">Appearance Settings</h1>
-          <div className="w-10"></div>
+          <button
+            onClick={() => {
+              toggleTheme();
+              toast.success(`Switched to ${theme === 'dark' ? 'light' : 'dark'} mode`);
+            }}
+            className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-200 hover:bg-gray-300'} flex items-center justify-center transition`}
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {theme === 'dark' ? (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+            )}
+          </button>
         </div>
       </div>
 
@@ -127,7 +146,7 @@ export default function AppearancePage() {
       <div className="p-6 max-w-4xl mx-auto">
         <div className="mb-6">
           <h2 className="text-2xl font-bold mb-2">Profile Background</h2>
-          <p className="text-gray-400 text-sm">Choose a background for your profile</p>
+          <p className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} text-sm`}>Choose a background for your profile</p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -135,19 +154,19 @@ export default function AppearancePage() {
           <button
             onClick={() => backgroundInputRef.current?.click()}
             disabled={uploadingBackground}
-            className="aspect-[3/4] border-2 border-dashed border-white/20 rounded-xl flex flex-col items-center justify-center hover:border-white/40 transition disabled:opacity-50 disabled:cursor-not-allowed bg-white/5"
+            className={`aspect-[3/4] border-2 border-dashed ${theme === 'dark' ? 'border-white/20 hover:border-white/40 bg-white/5' : 'border-gray-300 hover:border-gray-400 bg-gray-100'} rounded-xl flex flex-col items-center justify-center transition disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             {uploadingBackground ? (
               <>
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mb-2"></div>
-                <span className="text-sm text-gray-400">Uploading...</span>
+                <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${theme === 'dark' ? 'border-white' : 'border-black'} mb-2`}></div>
+                <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Uploading...</span>
               </>
             ) : (
               <>
-                <svg className="w-8 h-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-8 h-8 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} mb-2`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                <span className="text-sm text-gray-400 text-center px-2">Choose from device</span>
+                <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} text-center px-2`}>Choose from device</span>
               </>
             )}
           </button>
@@ -165,7 +184,7 @@ export default function AppearancePage() {
               key={bg._id}
               onClick={() => handleSelectBackground(bg.url)}
               className={`aspect-[3/4] rounded-xl overflow-hidden border-4 transition relative group ${
-                selectedBackground === bg.url ? 'border-blue-500' : 'border-transparent hover:border-white/20'
+                selectedBackground === bg.url ? 'border-blue-500' : `border-transparent ${theme === 'dark' ? 'hover:border-white/20' : 'hover:border-gray-300'}`
               }`}
             >
               <Image
@@ -190,7 +209,7 @@ export default function AppearancePage() {
 
         {backgrounds.length === 0 && !uploadingBackground && (
           <div className="text-center py-12">
-            <p className="text-gray-400">No backgrounds available. Upload one to get started!</p>
+            <p className={theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}>No backgrounds available. Upload one to get started!</p>
           </div>
         )}
       </div>

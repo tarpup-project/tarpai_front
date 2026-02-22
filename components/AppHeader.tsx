@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createPortal } from 'react-dom';
+import { useTheme } from '@/hooks/useTheme';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { io, Socket } from 'socket.io-client';
@@ -25,6 +26,7 @@ interface Notification {
 
 export default function AppHeader() {
   const router = useRouter();
+  const { theme } = useTheme();
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -124,7 +126,7 @@ export default function AppHeader() {
         window.location.href = `/chat/${notification.sender._id}`;
       } else if ((notification.type === 'new_follower' || notification.type === 'follow') && notification.sender) {
         const username = notification.sender.username || notification.sender._id;
-        router.push(`/profile/${username}`);
+        router.push(`/${username}`);
       }
     } catch (error) {
       console.error('Failed to handle notification:', error);
@@ -203,7 +205,7 @@ export default function AppHeader() {
         <div className="flex gap-4">
           <button 
             onClick={handleOpenNotifications}
-            className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center hover:bg-black/50 transition relative"
+            className={`w-12 h-12 rounded-full ${theme === 'dark' ? 'bg-black/30 hover:bg-black/50' : 'bg-white/30 hover:bg-white/50'} backdrop-blur-md flex items-center justify-center transition relative`}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -216,7 +218,7 @@ export default function AppHeader() {
           </button>
           <button 
             onClick={() => router.push('/appearance')}
-            className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center hover:bg-black/50 transition"
+            className={`w-12 h-12 rounded-full ${theme === 'dark' ? 'bg-black/30 hover:bg-black/50' : 'bg-white/30 hover:bg-white/50'} backdrop-blur-md flex items-center justify-center transition`}
           >
             <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
               <path d="M17.5,12A1.5,1.5 0 0,1 16,10.5A1.5,1.5 0 0,1 17.5,9A1.5,1.5 0 0,1 19,10.5A1.5,1.5 0 0,1 17.5,12M14.5,8A1.5,1.5 0 0,1 13,6.5A1.5,1.5 0 0,1 14.5,5A1.5,1.5 0 0,1 16,6.5A1.5,1.5 0 0,1 14.5,8M9.5,8A1.5,1.5 0 0,1 8,6.5A1.5,1.5 0 0,1 9.5,5A1.5,1.5 0 0,1 11,6.5A1.5,1.5 0 0,1 9.5,8M6.5,12A1.5,1.5 0 0,1 5,10.5A1.5,1.5 0 0,1 6.5,9A1.5,1.5 0 0,1 8,10.5A1.5,1.5 0 0,1 6.5,12M12,3A9,9 0 0,0 3,12A9,9 0 0,0 12,21A1.5,1.5 0 0,0 13.5,19.5C13.5,19.11 13.35,18.76 13.11,18.5C12.88,18.23 12.73,17.88 12.73,17.5A1.5,1.5 0 0,1 14.23,16H16A5,5 0 0,0 21,11C21,6.58 16.97,3 12,3Z" />
@@ -224,7 +226,7 @@ export default function AppHeader() {
           </button>
           <button 
             onClick={() => router.push('/share-profile')}
-            className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center hover:bg-black/50 transition"
+            className={`w-12 h-12 rounded-full ${theme === 'dark' ? 'bg-black/30 hover:bg-black/50' : 'bg-white/30 hover:bg-white/50'} backdrop-blur-md flex items-center justify-center transition`}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -235,14 +237,14 @@ export default function AppHeader() {
 
       {/* Notifications Modal */}
       {mounted && showNotificationsModal && createPortal(
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end" onClick={() => setShowNotificationsModal(false)}>
+        <div className={`fixed inset-0 ${theme === 'dark' ? 'bg-black/60' : 'bg-black/40'} backdrop-blur-sm z-[100] flex items-end`} onClick={() => setShowNotificationsModal(false)}>
           <div 
-            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
+            className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+            <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} flex items-center justify-between`}>
               <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold text-black">Notifications</h2>
+                <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>Notifications</h2>
                 {unreadCount > 0 && (
                   <span className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white">
                     {unreadCount}
@@ -251,7 +253,7 @@ export default function AppHeader() {
               </div>
               <button
                 onClick={() => setShowNotificationsModal(false)}
-                className="text-gray-400 hover:text-gray-900"
+                className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-900'}`}
               >
                 ✕
               </button>
@@ -260,7 +262,7 @@ export default function AppHeader() {
             <div className="flex-1 overflow-y-auto p-4">
               {notifications.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-sm text-gray-500">No more notifications</p>
+                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>No more notifications</p>
                 </div>
               ) : (
                 <>
@@ -270,19 +272,21 @@ export default function AppHeader() {
                         key={notification._id}
                         onClick={() => handleNotificationClick(notification)}
                         className={`p-3 rounded-xl cursor-pointer transition ${
-                          notification.isRead ? 'bg-gray-50 hover:bg-gray-100' : 'bg-blue-50 hover:bg-blue-100'
+                          theme === 'dark'
+                            ? notification.isRead ? 'bg-gray-800 hover:bg-gray-700' : 'bg-blue-900/30 hover:bg-blue-900/50'
+                            : notification.isRead ? 'bg-gray-50 hover:bg-gray-100' : 'bg-blue-50 hover:bg-blue-100'
                         }`}
                       >
                         <div className="flex gap-3">
                           {getNotificationIcon(notification)}
                           <div className="flex-1">
                             <div className="flex items-start justify-between mb-1">
-                              <h3 className="text-sm font-semibold text-black">{notification.title}</h3>
-                              <span className="text-xs text-gray-500">
+                              <h3 className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>{notification.title}</h3>
+                              <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                                 {new Date(notification.createdAt).toLocaleDateString()}
                               </span>
                             </div>
-                            <p className="text-xs text-gray-600 mb-2">{notification.message}</p>
+                            <p className={`text-xs ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'} mb-2`}>{notification.message}</p>
                             {!notification.isRead && (
                               <div className="w-2 h-2 bg-blue-500 rounded-full absolute right-4 top-1/2 -translate-y-1/2"></div>
                             )}
@@ -297,7 +301,7 @@ export default function AppHeader() {
                       <button
                         onClick={loadMoreNotifications}
                         disabled={loadingMore}
-                        className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 text-sm font-medium min-w-[120px] relative"
+                        className={`px-6 py-2 ${theme === 'dark' ? 'bg-gray-800 text-gray-200 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} rounded-lg transition disabled:opacity-50 text-sm font-medium min-w-[120px] relative`}
                       >
                         <span className="block">
                           {loadingMore ? 'Loading...' : 'Load More'}

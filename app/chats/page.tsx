@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useBackground } from '@/hooks/useBackground';
+import { useTheme } from '@/hooks/useTheme';
 import Image from 'next/image';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
@@ -67,6 +68,7 @@ export default function ChatsPage() {
   const router = useRouter();
   const currentUser = useAuthStore((state) => state.user);
   const { background } = useBackground();
+  const { theme } = useTheme();
   
   // Read tab from URL parameter, default to 'chats'
   const getInitialTab = (): 'chats' | 'channels' | 'broadcasts' => {
@@ -102,6 +104,7 @@ export default function ChatsPage() {
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [mainSearchQuery, setMainSearchQuery] = useState('');
 
   useEffect(() => {
     // Handle browser back/forward navigation
@@ -418,6 +421,41 @@ export default function ChatsPage() {
     follower.username?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Helper function to format time
+  const formatMessageTime = (dateString: string) => {
+    const messageDate = new Date(dateString);
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    // Reset time to midnight for date comparison
+    const messageDateOnly = new Date(messageDate.getFullYear(), messageDate.getMonth(), messageDate.getDate());
+    const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterdayDateOnly = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+
+    // Format time as HH:MM
+    const timeString = messageDate.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false 
+    });
+
+    if (messageDateOnly.getTime() === todayDateOnly.getTime()) {
+      // Today - show only time
+      return timeString;
+    } else if (messageDateOnly.getTime() === yesterdayDateOnly.getTime()) {
+      // Yesterday - show "Yesterday HH:MM"
+      return `Yesterday ${timeString}`;
+    } else {
+      // Older - show date
+      return messageDate.toLocaleDateString('en-US', { 
+        day: '2-digit', 
+        month: '2-digit', 
+        year: 'numeric' 
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -457,13 +495,15 @@ export default function ChatsPage() {
             </svg>
             <input
               type="text"
+              value={mainSearchQuery}
+              onChange={(e) => setMainSearchQuery(e.target.value)}
               placeholder="Search..."
-              className="w-full bg-black/40 backdrop-blur-md border border-white/10 rounded-full pl-12 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-white/30"
+              className={`w-full ${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-full pl-12 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-white/30`}
             />
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-2 bg-black/40 backdrop-blur-md rounded-full p-1 mb-5">
+          <div className={`flex gap-2 ${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md rounded-full p-1 mb-5`}>
             <button
               onClick={() => handleTabSwitch('chats')}
               className={`flex-1 py-2 px-4 rounded-full font-medium transition ${
@@ -508,14 +548,24 @@ export default function ChatsPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {conversations.map((conversation) => {
+                  {conversations
+                    .filter(conversation => {
+                      if (!mainSearchQuery.trim()) return true;
+                      const searchLower = mainSearchQuery.toLowerCase();
+                      return (
+                        conversation.participant.name?.toLowerCase().includes(searchLower) ||
+                        conversation.participant.displayName?.toLowerCase().includes(searchLower) ||
+                        conversation.participant.username?.toLowerCase().includes(searchLower)
+                      );
+                    })
+                    .map((conversation) => {
                     const isParticipantActive = activeUsers[conversation.id]?.[conversation.participant._id] || false;
                     
                     return (
                       <div
                         key={conversation.id}
                         onClick={() => handleChatNavigation(conversation.participant._id)}
-                        className="bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex items-center gap-4 hover:bg-black/60 transition cursor-pointer"
+                        className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-2xl p-4 flex items-center gap-4 ${theme === 'dark' ? 'hover:bg-black/60' : 'hover:bg-white/20'} transition cursor-pointer`}
                       >
                         <div className="relative">
                           <Image
@@ -551,7 +601,7 @@ export default function ChatsPage() {
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           <span className="text-xs text-gray-400">
-                            {new Date(conversation.lastActivity).toLocaleDateString()}
+                            {formatMessageTime(conversation.lastActivity)}
                           </span>
                           {conversation.unreadCount > 0 && (
                             <div className="min-w-[24px] h-6 bg-white rounded-full flex items-center justify-center px-2">
@@ -574,7 +624,7 @@ export default function ChatsPage() {
               {/* Create New Channel Button */}
               <div 
                 onClick={() => setShowCreateChannelModal(true)}
-                className="bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex items-center gap-4 hover:bg-black/60 transition cursor-pointer mb-6"
+                className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-2xl p-4 flex items-center gap-4 ${theme === 'dark' ? 'hover:bg-black/60' : 'hover:bg-white/20'} transition cursor-pointer mb-6`}
               >
                 <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -596,11 +646,21 @@ export default function ChatsPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {channels.filter(channel => channel.owner._id === currentUser?.id).map((channel) => (
+                    {channels
+                      .filter(channel => channel.owner._id === currentUser?.id)
+                      .filter(channel => {
+                        if (!mainSearchQuery.trim()) return true;
+                        const searchLower = mainSearchQuery.toLowerCase();
+                        return (
+                          channel.title?.toLowerCase().includes(searchLower) ||
+                          channel.subtitle?.toLowerCase().includes(searchLower)
+                        );
+                      })
+                      .map((channel) => (
                       <div
                         key={channel.id}
                         onClick={() => handleChannelNavigation(channel.id)}
-                        className="bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex items-center gap-4 hover:bg-black/60 transition cursor-pointer"
+                        className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-2xl p-4 flex items-center gap-4 ${theme === 'dark' ? 'hover:bg-black/60' : 'hover:bg-white/20'} transition cursor-pointer`}
                       >
                         <Image
                           src={channel.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
@@ -634,11 +694,20 @@ export default function ChatsPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {channels.map((channel) => (
+                    {channels
+                      .filter(channel => {
+                        if (!mainSearchQuery.trim()) return true;
+                        const searchLower = mainSearchQuery.toLowerCase();
+                        return (
+                          channel.title?.toLowerCase().includes(searchLower) ||
+                          channel.subtitle?.toLowerCase().includes(searchLower)
+                        );
+                      })
+                      .map((channel) => (
                       <div
                         key={channel.id}
                         onClick={() => handleChannelNavigation(channel.id)}
-                        className="bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex items-center gap-4 hover:bg-black/60 transition cursor-pointer"
+                        className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-2xl p-4 flex items-center gap-4 ${theme === 'dark' ? 'hover:bg-black/60' : 'hover:bg-white/20'} transition cursor-pointer`}
                       >
                         <Image
                           src={channel.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
@@ -674,7 +743,7 @@ export default function ChatsPage() {
               {/* New Broadcast Button */}
               <div 
                 onClick={() => setShowBroadcastModal(true)}
-                className="bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex items-center gap-4 hover:bg-black/60 transition cursor-pointer mb-6"
+                className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-2xl p-4 flex items-center gap-4 ${theme === 'dark' ? 'hover:bg-black/60' : 'hover:bg-white/20'} transition cursor-pointer mb-6`}
               >
                 <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -708,10 +777,16 @@ export default function ChatsPage() {
                     <div>
                       <h3 className="text-lg font-semibold text-white mb-4">SENT</h3>
                       <div className="space-y-3">
-                        {sentBroadcasts.map((broadcast) => (
+                        {sentBroadcasts
+                          .filter(broadcast => {
+                            if (!mainSearchQuery.trim()) return true;
+                            const searchLower = mainSearchQuery.toLowerCase();
+                            return broadcast.message?.toLowerCase().includes(searchLower);
+                          })
+                          .map((broadcast) => (
                           <div
                             key={broadcast._id}
-                            className="bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-4"
+                            className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-2xl p-4`}
                           >
                             <div className="flex items-center justify-between mb-3">
                               <span className="text-xs text-gray-400">
@@ -738,10 +813,21 @@ export default function ChatsPage() {
                     <div>
                       <h3 className="text-lg font-semibold text-white mb-4">RECEIVED</h3>
                       <div className="space-y-3">
-                        {receivedBroadcasts.map((broadcast) => (
+                        {receivedBroadcasts
+                          .filter(broadcast => {
+                            if (!mainSearchQuery.trim()) return true;
+                            const searchLower = mainSearchQuery.toLowerCase();
+                            return (
+                              broadcast.message?.toLowerCase().includes(searchLower) ||
+                              broadcast.sender?.name?.toLowerCase().includes(searchLower) ||
+                              broadcast.sender?.displayName?.toLowerCase().includes(searchLower) ||
+                              broadcast.sender?.username?.toLowerCase().includes(searchLower)
+                            );
+                          })
+                          .map((broadcast) => (
                           <div
                             key={broadcast._id}
-                            className="bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-4"
+                            className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-2xl p-4`}
                           >
                             <div className="flex items-start gap-3 mb-3">
                               <Image
@@ -790,7 +876,7 @@ export default function ChatsPage() {
       {activeTab === 'chats' && (
         <button
           onClick={handleOpenNewChat}
-          className="fixed bottom-24 right-6 w-14 h-14 bg-black/40 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 hover:bg-black/60 z-30"
+          className={`fixed bottom-24 right-6 w-14 h-14 ${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 ${theme === 'dark' ? 'hover:bg-black/60' : 'hover:bg-white/20'} z-30`}
         >
           <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -802,15 +888,15 @@ export default function ChatsPage() {
       {showCreateChannelModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowCreateChannelModal(false)}>
           <div 
-            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
+            className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-6 border-b border-gray-200">
+            <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-black">Create New Channel</h2>
+                <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>Create New Channel</h2>
                 <button
                   onClick={() => setShowCreateChannelModal(false)}
-                  className="text-gray-400 hover:text-gray-900"
+                  className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-900'}`}
                 >
                   ✕
                 </button>
@@ -821,21 +907,22 @@ export default function ChatsPage() {
               <div className="space-y-4">
                 {/* Avatar Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                     Channel Avatar
                   </label>
                   <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
+                    <div className={`w-16 h-16 ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'} rounded-full flex items-center justify-center overflow-hidden`}>
                       {channelForm.avatar ? (
                         <Image
                           src={URL.createObjectURL(channelForm.avatar)}
-                          alt="Avatar preview"
+                          alt="Channel avatar preview"
                           width={64}
                           height={64}
                           className="w-full h-full object-cover"
+                          unoptimized
                         />
                       ) : (
-                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className={`w-8 h-8 ${theme === 'dark' ? 'text-gray-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                       )}
@@ -849,7 +936,7 @@ export default function ChatsPage() {
                     />
                     <button
                       onClick={() => channelFileInputRef.current?.click()}
-                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+                      className={`px-4 py-2 ${theme === 'dark' ? 'bg-gray-800 text-gray-200 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} rounded-lg transition`}
                     >
                       Select Image
                     </button>
@@ -858,7 +945,7 @@ export default function ChatsPage() {
 
                 {/* Title */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                     Channel Title
                   </label>
                   <input
@@ -866,13 +953,13 @@ export default function ChatsPage() {
                     value={channelForm.title}
                     onChange={(e) => setChannelForm(prev => ({ ...prev, title: e.target.value }))}
                     placeholder="My Updates"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-black"
+                    className={`w-full px-4 py-3 border ${theme === 'dark' ? 'border-gray-700 bg-gray-800 text-white placeholder-gray-500' : 'border-gray-300 bg-white text-black placeholder-gray-400'} rounded-lg focus:outline-none focus:ring-2 ${theme === 'dark' ? 'focus:ring-white' : 'focus:ring-black'}`}
                   />
                 </div>
 
                 {/* Subtitle */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                     Channel Subtitle
                   </label>
                   <input
@@ -880,17 +967,17 @@ export default function ChatsPage() {
                     value={channelForm.subtitle}
                     onChange={(e) => setChannelForm(prev => ({ ...prev, subtitle: e.target.value }))}
                     placeholder="Official updates from me"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-black"
+                    className={`w-full px-4 py-3 border ${theme === 'dark' ? 'border-gray-700 bg-gray-800 text-white placeholder-gray-500' : 'border-gray-300 bg-white text-black placeholder-gray-400'} rounded-lg focus:outline-none focus:ring-2 ${theme === 'dark' ? 'focus:ring-white' : 'focus:ring-black'}`}
                   />
                 </div>
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200">
+            <div className={`p-6 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
               <button
                 onClick={handleCreateChannel}
                 disabled={creatingChannel || !channelForm.title.trim() || !channelForm.subtitle.trim() || !channelForm.avatar}
-                className="w-full bg-black text-white py-3 rounded-lg font-semibold hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`w-full ${theme === 'dark' ? 'bg-white text-black hover:bg-gray-200' : 'bg-black text-white hover:bg-gray-800'} py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {creatingChannel ? 'Creating...' : 'Create Channel'}
               </button>
@@ -903,29 +990,29 @@ export default function ChatsPage() {
       {showBroadcastModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowBroadcastModal(false)}>
           <div 
-            className="bg-white rounded-t-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-slide-up"
+            className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-slide-up`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="p-6 border-b border-gray-200">
+            <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
               <div className="flex items-center gap-4">
                 <button
                   onClick={() => setShowBroadcastModal(false)}
-                  className="text-gray-600 hover:text-gray-900"
+                  className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                <h2 className="text-xl font-bold text-black">New Broadcast</h2>
+                <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>New Broadcast</h2>
               </div>
             </div>
 
             {/* To Field */}
-            <div className="px-6 py-4 border-b border-gray-200">
+            <div className={`px-6 py-4 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
               <div className="flex items-center gap-2">
-                <span className="text-gray-600 font-medium">To:</span>
-                <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
+                <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'} font-medium`}>To:</span>
+                <span className={`${theme === 'dark' ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'} px-3 py-1 rounded-full text-sm font-medium`}>
                   All Followers
                 </span>
               </div>
@@ -938,14 +1025,14 @@ export default function ChatsPage() {
                 onChange={(e) => setBroadcastMessage(e.target.value)}
                 maxLength={500}
                 placeholder="What's on your mind? This message will be sent to all your followers."
-                className="w-full h-full min-h-[300px] text-black placeholder-gray-400 focus:outline-none resize-none text-lg"
+                className={`w-full h-full min-h-[300px] ${theme === 'dark' ? 'text-white placeholder-gray-500 bg-transparent' : 'text-black placeholder-gray-400 bg-transparent'} focus:outline-none resize-none text-lg`}
               />
             </div>
 
             {/* Footer */}
-            <div className="p-6 border-t border-gray-200">
+            <div className={`p-6 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
               <div className="flex items-center justify-between mb-4">
-                <span className="text-sm text-gray-500">
+                <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                   {broadcastMessage.length}/500
                 </span>
               </div>
@@ -953,7 +1040,7 @@ export default function ChatsPage() {
               <button
                 onClick={handleSendBroadcast}
                 disabled={sendingBroadcast || !broadcastMessage.trim()}
-                className="w-full bg-gray-800 text-white py-4 rounded-2xl font-semibold hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className={`w-full ${theme === 'dark' ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-800 text-white hover:bg-gray-700'} py-4 rounded-2xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -961,7 +1048,7 @@ export default function ChatsPage() {
                 {sendingBroadcast ? 'Sending...' : 'Send Broadcast'}
               </button>
               
-              <p className="text-xs text-gray-500 text-center mt-3">
+              <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-center mt-3`}>
                 Followers will receive a notification. Replies are disabled.
               </p>
             </div>
