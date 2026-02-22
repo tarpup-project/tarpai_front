@@ -5,12 +5,12 @@ export const API_CONFIG = {
   // API Base URL
   API_URL: isDevelopment 
     ? 'http://localhost:3000' 
-    : process.env.NEXT_PUBLIC_API_URL || 'https://your-backend-app.onrender.com',
+    : process.env.NEXT_PUBLIC_API_URL || 'https://tarpai-back.onrender.com',
   
   // WebSocket URL
   WS_URL: isDevelopment 
     ? 'http://localhost:3000' 
-    : process.env.NEXT_PUBLIC_WS_URL || 'https://your-backend-app.onrender.com',
+    : process.env.NEXT_PUBLIC_WS_URL || 'https://tarpai-back.onrender.com',
 };
 
 // Export individual values for convenience
