@@ -1,6 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3000';
+import { WS_URL } from '@/config/api.config';
 
 let socket: Socket | null = null;
 
