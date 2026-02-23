@@ -1,16 +1,19 @@
 // API Configuration
-const isDevelopment = process.env.NODE_ENV === 'development';
+// Check if we're in browser and on production domain
+const isProduction = typeof window !== 'undefined' 
+  ? window.location.hostname.includes('onrender.com')
+  : process.env.NODE_ENV === 'production';
 
 export const API_CONFIG = {
   // API Base URL
-  API_URL: isDevelopment 
-    ? 'https://tarpai-back.onrender.com' 
-    : 'https://tarpai-back.onrender.com',
+  API_URL: isProduction
+    ? 'https://tarpai-back.onrender.com'
+    : 'http://localhost:3000',
   
   // WebSocket URL
-  WS_URL: isDevelopment 
-    ? 'https://tarpai-back.onrender.com' 
-    : 'https://tarpai-back.onrender.com',
+  WS_URL: isProduction
+    ? 'https://tarpai-back.onrender.com'
+    : 'http://localhost:3000',
 };
 
 // Export individual values for convenience
