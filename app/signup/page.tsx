@@ -21,25 +21,45 @@ export default function SignupPage() {
   const [sendingCode, setSendingCode] = useState(false);
 
   const handleGetCode = async () => {
+    console.log('handleGetCode called');
+    console.log('Form data:', { name, email, password: '***', codeSent });
+    
     if (!name || !email || !password) {
+      console.log('Validation failed: missing fields');
       toast.error('Please fill in all fields first');
       return;
     }
 
     if (password.length < 6) {
+      console.log('Validation failed: password too short');
       toast.error('Password must be at least 6 characters');
       return;
     }
 
+    console.log('Starting request...');
     setSendingCode(true);
 
     try {
-      await api.post('/auth/signup', { name, email, password });
-      toast.success('Verification code sent to your email!');
-      setCodeSent(true);
+      if (codeSent) {
+        console.log('Resending code to:', email);
+        const response = await api.post('/auth/resend-code', { email });
+        console.log('Resend response:', response.data);
+        toast.success('Verification code resent to your email!');
+      } else {
+        console.log('Initial signup for:', email);
+        const response = await api.post('/auth/signup', { name, email, password });
+        console.log('Signup response:', response.data);
+        toast.success('Verification code sent to your email!');
+        setCodeSent(true);
+      }
+      console.log('Request completed successfully');
     } catch (error: any) {
+      console.error('Request failed:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
       toast.error(error.response?.data?.message || 'Failed to send code');
     } finally {
+      console.log('Request finished, resetting sendingCode state');
       setSendingCode(false);
     }
   };
@@ -163,10 +183,10 @@ export default function SignupPage() {
                 <button
                   type="button"
                   onClick={handleGetCode}
-                  disabled={sendingCode || codeSent}
+                  disabled={sendingCode}
                   className="bg-gray-800 text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 >
-                  {sendingCode ? 'Sending...' : codeSent ? 'Code Sent' : 'Get Code'}
+                  {sendingCode ? 'Sending...' : codeSent ? 'Resend Code' : 'Get Code'}
                 </button>
               </div>
               {codeSent && (

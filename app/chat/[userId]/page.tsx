@@ -6,8 +6,10 @@ import { useAuthStore } from '@/store/authStore';
 import { useBackground } from '@/hooks/useBackground';
 import Image from 'next/image';
 import api from '@/lib/api';
+import { WS_URL } from '@/config/api.config';
 import { io, Socket } from 'socket.io-client';
 import toast from 'react-hot-toast';
+import ImageCropper from '@/components/ImageCropper';
 
 interface Message {
   _id: string;
@@ -53,6 +55,8 @@ export default function ChatPage() {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [showCropper, setShowCropper] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -128,7 +132,7 @@ export default function ChatPage() {
 
       // Initialize socket connection
       const token = localStorage.getItem('token');
-      const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000', {
+      const socket = io(WS_URL, {
         auth: { token },
       });
 
@@ -371,12 +375,43 @@ export default function ChatPage() {
         return;
       }
 
-      setSelectedImage(file);
+      // Show cropper instead of directly setting the image
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreview(reader.result as string);
+        setImageToCrop(reader.result as string);
+        setShowCropper(true);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCropComplete = (croppedBlob: Blob) => {
+    // Convert blob to file
+    const croppedFile = new File([croppedBlob], 'cropped-image.jpg', { type: 'image/jpeg' });
+    setSelectedImage(croppedFile);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(croppedFile);
+    
+    // Close cropper
+    setShowCropper(false);
+    setImageToCrop(null);
+    
+    // Clear file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleCropCancel = () => {
+    setShowCropper(false);
+    setImageToCrop(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -777,7 +812,7 @@ export default function ChatPage() {
 
         {/* Input */}
         <div className="bg-black/40 backdrop-blur-md border-t border-white/10 p-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -787,9 +822,9 @@ export default function ChatPage() {
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600 transition"
+              className="w-10 h-10 shrink-0 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition"
             >
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </button>
@@ -800,17 +835,17 @@ export default function ChatPage() {
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
               disabled={uploadingImage}
-              className="flex-1 bg-black/40 backdrop-blur-md text-white rounded-full px-6 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 border border-white/10 placeholder-gray-400 disabled:opacity-50"
+              className="flex-1 min-w-0 bg-black/40 backdrop-blur-md text-white rounded-full px-5 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-600 border border-white/10 placeholder-gray-400 disabled:opacity-50"
             />
             <button
               onClick={handleSendMessage}
               disabled={sending || uploadingImage || (!newMessage.trim() && !selectedImage)}
-              className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-10 h-10 shrink-0 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {uploadingImage ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
               ) : (
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                 </svg>
               )}
@@ -818,6 +853,16 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
+
+      {/* Image Cropper */}
+      {showCropper && imageToCrop && (
+        <ImageCropper
+          image={imageToCrop}
+          onCropComplete={handleCropComplete}
+          onCancel={handleCropCancel}
+          aspect={4 / 3}
+        />
+      )}
     </div>
   );
 }

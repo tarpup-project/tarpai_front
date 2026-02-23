@@ -264,9 +264,8 @@ export default function ChatsPage() {
 
   const fetchChannels = async () => {
     try {
-      const response = await fetch('http://localhost:3000/channels');
-      const data = await response.json();
-      setChannels(data);
+      const response = await api.get('/channels');
+      setChannels(response.data);
     } catch (error) {
       console.error('Failed to fetch channels:', error);
       toast.error('Failed to load channels');

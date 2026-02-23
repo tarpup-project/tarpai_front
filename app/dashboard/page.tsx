@@ -11,6 +11,7 @@ import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import AppHeader from '@/components/AppHeader';
 import BottomNav from '@/components/BottomNav';
+import ImageCropper from '@/components/ImageCropper';
 
 interface Link {
   _id: string;
@@ -68,6 +69,8 @@ export default function DashboardPage() {
   const [bio, setBio] = useState('');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState('');
+  const [showAvatarCropper, setShowAvatarCropper] = useState(false);
+  const [avatarToCrop, setAvatarToCrop] = useState<string | null>(null);
 
   // Wait for Zustand to rehydrate from localStorage
   useEffect(() => {
@@ -133,12 +136,53 @@ export default function DashboardPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setAvatarFile(file);
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast.error('Image size must be less than 5MB');
+        return;
+      }
+      
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file');
+        return;
+      }
+
+      // Show cropper instead of directly setting the image
       const reader = new FileReader();
       reader.onloadend = () => {
-        setAvatarPreview(reader.result as string);
+        setAvatarToCrop(reader.result as string);
+        setShowAvatarCropper(true);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAvatarCropComplete = (croppedBlob: Blob) => {
+    // Convert blob to file
+    const croppedFile = new File([croppedBlob], 'avatar.jpg', { type: 'image/jpeg' });
+    setAvatarFile(croppedFile);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result as string);
+    };
+    reader.readAsDataURL(croppedFile);
+    
+    // Close cropper
+    setShowAvatarCropper(false);
+    setAvatarToCrop(null);
+    
+    // Clear file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleAvatarCropCancel = () => {
+    setShowAvatarCropper(false);
+    setAvatarToCrop(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -460,10 +504,10 @@ export default function DashboardPage() {
         <AppHeader />
 
         {/* Profile Section */}
-        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
+        <div className="flex-1 flex flex-col items-center justify-start px-6 pb-32 pt-4">
           {/* Avatar with Camera Button */}
-          <div className="relative mb-6">
-            <div className="w-40 h-40 rounded-full border-4 border-white/20 overflow-hidden bg-gray-800">
+          <div className="relative mb-4">
+            <div className="w-28 h-28 rounded-full border-4 border-white/20 overflow-hidden bg-gray-800">
               <Image
                 src={user.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
                 alt={user.displayName || user.name}
@@ -478,7 +522,7 @@ export default function DashboardPage() {
             </div>
             <button 
               onClick={handleEditProfile}
-              className="absolute bottom-2 right-2 w-12 h-12 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center hover:bg-black/80 transition"
+              className="absolute bottom-0 right-0 w-12 h-12 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center hover:bg-black/80 transition"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -490,7 +534,7 @@ export default function DashboardPage() {
           {/* Name and Username */}
           <div className="text-center mb-2">
             <div className="flex items-center justify-center gap-2 mb-1">
-              <h1 className="text-3xl font-bold">{user.displayName || user.name}</h1>
+              <h1 className="text-xl font-bold">{user.displayName || user.name}</h1>
               <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
@@ -501,12 +545,12 @@ export default function DashboardPage() {
               </button>
             </div>
             {user.username && (
-              <p className="text-gray-300 text-lg">@{user.username}</p>
+              <p className="text-gray-300 text-base">@{user.username}</p>
             )}
           </div>
 
           {/* Bio */}
-          <p className="text-center text-white/90 max-w-md mb-8 px-4">
+          <p className="text-center text-white/90 text-sm max-w-md mb-6 px-4">
             {user.bio || 'No bio yet. Click edit to add one.'}
           </p>
 
@@ -516,8 +560,8 @@ export default function DashboardPage() {
               onClick={() => setShowFollowersModal(true)}
               className="text-center hover:opacity-80 transition"
             >
-              <div className="text-3xl font-bold">{followersCount.toLocaleString()}</div>
-              <div className="text-gray-300 text-sm uppercase tracking-wide">Followers</div>
+              <div className="text-xl font-bold">{followersCount.toLocaleString()}</div>
+              <div className="text-gray-300 text-xs uppercase tracking-wide">Followers</div>
             </button>
             <div className="w-px bg-white/20"></div>
             <button 
@@ -530,15 +574,15 @@ export default function DashboardPage() {
               }}
               className="text-center hover:opacity-80 transition"
             >
-              <div className="text-3xl font-bold">{followingCount.toLocaleString()}</div>
-              <div className="text-gray-300 text-sm uppercase tracking-wide">Following</div>
+              <div className="text-xl font-bold">{followingCount.toLocaleString()}</div>
+              <div className="text-gray-300 text-xs uppercase tracking-wide">Following</div>
             </button>
           </div>
 
           {/* Add New Link Button */}
           <button 
             onClick={() => setShowAddLinkModal(true)}
-            className={`w-full max-w-md ${theme === 'dark' ? 'bg-black/30 border-white/20 hover:bg-black/50' : 'bg-white/30 border-gray-300 hover:bg-white/50'} backdrop-blur-md border rounded-2xl py-4 px-6 flex items-center justify-center gap-2 transition mb-4`}
+            className={`w-full max-w-md ${theme === 'dark' ? 'bg-black/30 border-white/20 hover:bg-black/50' : 'bg-white/30 border-gray-300 hover:bg-white/50'} backdrop-blur-md border rounded-2xl py-3 px-6 flex items-center justify-center gap-2 transition mb-3`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -547,53 +591,65 @@ export default function DashboardPage() {
           </button>
 
           {/* Links */}
-          <div className="w-full max-w-md space-y-3">
+          <div className="w-full max-w-md space-y-2">
             {links.map((link) => (
               <div 
                 key={link._id} 
-                className="bg-white/90 backdrop-blur-md rounded-2xl p-4 flex items-center gap-4 relative"
+                className="bg-white/90 backdrop-blur-md rounded-2xl p-3 flex items-center relative"
               >
-                <div className={`w-10 h-10 ${getLinkIconBgColor(link.url)} rounded-lg flex items-center justify-center`}>
-                  {getLinkIcon(link.url)}
+                {/* Icon on the left - using actual favicon */}
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-gray-100">
+                  <img 
+                    src={`https://www.google.com/s2/favicons?domain=${new URL(link.url).hostname}&sz=128`}
+                    alt={link.title}
+                    className="w-8 h-8 object-contain"
+                    onError={(e) => {
+                      // Fallback to custom icon if favicon fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const parent = target.parentElement;
+                      if (parent) {
+                        parent.className = `w-10 h-10 ${getLinkIconBgColor(link.url)} rounded-lg flex items-center justify-center flex-shrink-0`;
+                        parent.innerHTML = '';
+                        const iconContainer = document.createElement('div');
+                        parent.appendChild(iconContainer);
+                        // This is a workaround - ideally we'd render the React component properly
+                      }
+                    }}
+                  />
                 </div>
-                <div className="flex-1">
-                  <div className="text-black font-semibold">{link.title}</div>
-                  <div className="text-gray-600 text-sm truncate">{link.url}</div>
-                </div>
+                
+                {/* Title centered */}
                 <a 
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-gray-400 hover:text-gray-600"
+                  className="flex-1 text-center"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
+                  <div className="text-black font-semibold">{link.title}</div>
                 </a>
                 
-                {/* Three-dot menu */}
-                <div className="relative">
-                  <button 
-                    onClick={(e) => {
-                      if (openLinkMenu === link._id) {
-                        setOpenLinkMenu(null);
-                        setMenuPosition(null);
-                      } else {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        setMenuPosition({
-                          top: rect.bottom + 4,
-                          right: window.innerWidth - rect.right
-                        });
-                        setOpenLinkMenu(link._id);
-                      }
-                    }}
-                    className="text-gray-400 hover:text-gray-600 p-1"
-                  >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
-                    </svg>
-                  </button>
-                </div>
+                {/* Three-dot menu on the right */}
+                <button 
+                  onClick={(e) => {
+                    if (openLinkMenu === link._id) {
+                      setOpenLinkMenu(null);
+                      setMenuPosition(null);
+                    } else {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setMenuPosition({
+                        top: rect.bottom + 4,
+                        right: window.innerWidth - rect.right
+                      });
+                      setOpenLinkMenu(link._id);
+                    }
+                  }}
+                  className="text-gray-400 hover:text-gray-600 p-1 flex-shrink-0"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                  </svg>
+                </button>
               </div>
             ))}
           </div>
@@ -601,6 +657,16 @@ export default function DashboardPage() {
 
         {/* Bottom Navigation */}
         <BottomNav />
+
+        {/* Avatar Cropper */}
+        {showAvatarCropper && avatarToCrop && (
+          <ImageCropper
+            image={avatarToCrop}
+            onCropComplete={handleAvatarCropComplete}
+            onCancel={handleAvatarCropCancel}
+            aspect={1}
+          />
+        )}
       </div>
 
       {/* Edit Profile Modal */}

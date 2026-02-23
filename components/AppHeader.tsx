@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { createPortal } from 'react-dom';
 import { useTheme } from '@/hooks/useTheme';
 import api from '@/lib/api';
+import { WS_URL } from '@/config/api.config';
 import toast from 'react-hot-toast';
 import { io, Socket } from 'socket.io-client';
 
@@ -45,7 +46,7 @@ export default function AppHeader() {
     // Set up socket connection for real-time notification updates
     const token = localStorage.getItem('token');
     if (token) {
-      const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000', {
+      const socket = io(WS_URL, {
         auth: { token },
       });
 
@@ -197,38 +198,57 @@ export default function AppHeader() {
     }
   };
 
+  const handleLogout = () => {
+    // Clear auth state
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    
+    // Disconnect socket if connected
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+    }
+    
+    // Show success message
+    toast.success('Logged out successfully');
+    
+    // Redirect to login
+    router.push('/login');
+  };
+
   return (
     <>
       <div className="flex justify-between items-start p-6">
-        <Image src="/logo.png" alt="TarpAI" width={40} height={40} className="w-10 h-10" />
+        <button onClick={handleLogout} className="cursor-pointer">
+          <Image src="/logo.png" alt="TarpAI" width={32} height={32} className="w-8 h-8" />
+        </button>
         
-        <div className="flex gap-4">
+        <div className="flex gap-3">
           <button 
             onClick={handleOpenNotifications}
-            className={`w-12 h-12 rounded-full ${theme === 'dark' ? 'bg-black/30 hover:bg-black/50' : 'bg-white/30 hover:bg-white/50'} backdrop-blur-md flex items-center justify-center transition relative`}
+            className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-black/30 hover:bg-black/50' : 'bg-white/30 hover:bg-white/50'} backdrop-blur-md flex items-center justify-center transition relative`}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white">
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white">
                 {unreadCount}
               </span>
             )}
           </button>
           <button 
             onClick={() => router.push('/appearance')}
-            className={`w-12 h-12 rounded-full ${theme === 'dark' ? 'bg-black/30 hover:bg-black/50' : 'bg-white/30 hover:bg-white/50'} backdrop-blur-md flex items-center justify-center transition`}
+            className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-black/30 hover:bg-black/50' : 'bg-white/30 hover:bg-white/50'} backdrop-blur-md flex items-center justify-center transition`}
           >
-            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
               <path d="M17.5,12A1.5,1.5 0 0,1 16,10.5A1.5,1.5 0 0,1 17.5,9A1.5,1.5 0 0,1 19,10.5A1.5,1.5 0 0,1 17.5,12M14.5,8A1.5,1.5 0 0,1 13,6.5A1.5,1.5 0 0,1 14.5,5A1.5,1.5 0 0,1 16,6.5A1.5,1.5 0 0,1 14.5,8M9.5,8A1.5,1.5 0 0,1 8,6.5A1.5,1.5 0 0,1 9.5,5A1.5,1.5 0 0,1 11,6.5A1.5,1.5 0 0,1 9.5,8M6.5,12A1.5,1.5 0 0,1 5,10.5A1.5,1.5 0 0,1 6.5,9A1.5,1.5 0 0,1 8,10.5A1.5,1.5 0 0,1 6.5,12M12,3A9,9 0 0,0 3,12A9,9 0 0,0 12,21A1.5,1.5 0 0,0 13.5,19.5C13.5,19.11 13.35,18.76 13.11,18.5C12.88,18.23 12.73,17.88 12.73,17.5A1.5,1.5 0 0,1 14.23,16H16A5,5 0 0,0 21,11C21,6.58 16.97,3 12,3Z" />
             </svg>
           </button>
           <button 
             onClick={() => router.push('/share-profile')}
-            className={`w-12 h-12 rounded-full ${theme === 'dark' ? 'bg-black/30 hover:bg-black/50' : 'bg-white/30 hover:bg-white/50'} backdrop-blur-md flex items-center justify-center transition`}
+            className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-black/30 hover:bg-black/50' : 'bg-white/30 hover:bg-white/50'} backdrop-blur-md flex items-center justify-center transition`}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
             </svg>
           </button>
