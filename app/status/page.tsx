@@ -120,9 +120,10 @@ export default function StatusPage() {
       toast.success('Reposted successfully!');
       setShowStatusModal(false);
       fetchStatuses();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to repost:', error);
-      toast.error('Failed to repost');
+      const errorMessage = error.response?.data?.message || 'Failed to repost';
+      toast.error(errorMessage);
     }
   };
 
