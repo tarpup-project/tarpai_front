@@ -57,6 +57,7 @@ export default function ChatPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showCropper, setShowCropper] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -385,6 +386,27 @@ export default function ChatPage() {
     }
   };
 
+  const handleSkipCrop = () => {
+    // Use the original image without cropping
+    if (imageToCrop) {
+      // Convert data URL back to file
+      fetch(imageToCrop)
+        .then(res => res.blob())
+        .then(blob => {
+          const file = new File([blob], 'image.jpg', { type: 'image/jpeg' });
+          setSelectedImage(file);
+          setImagePreview(imageToCrop);
+          setShowCropper(false);
+          setImageToCrop(null);
+          
+          // Clear file input
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+        });
+    }
+  };
+
   const handleCropComplete = (croppedBlob: Blob) => {
     // Convert blob to file
     const croppedFile = new File([croppedBlob], 'cropped-image.jpg', { type: 'image/jpeg' });
@@ -543,7 +565,7 @@ export default function ChatPage() {
   };
 
   const handleBackNavigation = () => {
-    window.location.href = '/chats';
+    router.back();
   };
 
   const handleReplyClick = (replyToId: string) => {
@@ -722,7 +744,11 @@ export default function ChatPage() {
                         alt="Shared image"
                         width={300}
                         height={300}
-                        className="rounded-xl max-w-full h-auto object-cover"
+                        className="rounded-xl max-w-full h-auto object-cover cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPreviewImage(message.fileUrl || '');
+                        }}
                       />
                       {message.content && message.content !== 'Image' && (
                         <div className={`px-3 pb-2 ${isOwn ? 'text-black' : 'text-white'}`}>
@@ -860,8 +886,43 @@ export default function ChatPage() {
           image={imageToCrop}
           onCropComplete={handleCropComplete}
           onCancel={handleCropCancel}
+          onSkip={handleSkipCrop}
           aspect={4 / 3}
         />
+      )}
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div 
+          className="fixed inset-0 z-[9999] bg-black flex flex-col"
+          onClick={() => setPreviewImage(null)}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 bg-black/50 backdrop-blur-md">
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="text-white hover:text-gray-300 transition"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <h2 className="text-white font-semibold">Image</h2>
+            <div className="w-6"></div>
+          </div>
+
+          {/* Image Container */}
+          <div className="flex-1 flex items-center justify-center p-4">
+            <Image
+              src={previewImage}
+              alt="Preview"
+              width={1200}
+              height={1200}
+              className="max-w-full max-h-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

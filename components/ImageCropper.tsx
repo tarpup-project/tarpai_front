@@ -8,10 +8,11 @@ interface ImageCropperProps {
   image: string;
   onCropComplete: (croppedImage: Blob) => void;
   onCancel: () => void;
+  onSkip?: () => void;
   aspect?: number;
 }
 
-export default function ImageCropper({ image, onCropComplete, onCancel, aspect = 1 }: ImageCropperProps) {
+export default function ImageCropper({ image, onCropComplete, onCancel, onSkip, aspect = 1 }: ImageCropperProps) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
@@ -125,6 +126,14 @@ export default function ImageCropper({ image, onCropComplete, onCancel, aspect =
 
       {/* Zoom Control */}
       <div className="p-6 bg-black/50 backdrop-blur-md">
+        {onSkip && (
+          <button
+            onClick={onSkip}
+            className="w-full mb-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold transition"
+          >
+            Skip Crop - Use Original
+          </button>
+        )}
         <div className="flex items-center gap-4">
           <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />

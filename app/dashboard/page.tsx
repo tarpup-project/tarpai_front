@@ -178,6 +178,27 @@ export default function DashboardPage() {
     }
   };
 
+  const handleAvatarSkipCrop = () => {
+    // Use the original image without cropping
+    if (avatarToCrop) {
+      // Convert data URL back to file
+      fetch(avatarToCrop)
+        .then(res => res.blob())
+        .then(blob => {
+          const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
+          setAvatarFile(file);
+          setAvatarPreview(avatarToCrop);
+          setShowAvatarCropper(false);
+          setAvatarToCrop(null);
+          
+          // Clear file input
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+        });
+    }
+  };
+
   const handleAvatarCropCancel = () => {
     setShowAvatarCropper(false);
     setAvatarToCrop(null);
@@ -584,11 +605,28 @@ export default function DashboardPage() {
             onClick={() => setShowAddLinkModal(true)}
             className={`w-full max-w-md ${theme === 'dark' ? 'bg-black/30 border-white/20 hover:bg-black/50' : 'bg-white/30 border-gray-300 hover:bg-white/50'} backdrop-blur-md border rounded-2xl py-3 px-6 flex items-center justify-center gap-2 transition mb-3`}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            <span className="font-semibold">Add New Link</span>
+            <span className="font-semibold text-[12px]">Add New Link</span>
           </button>
+
+          {/* Handles Divider */}
+          <div className="w-full max-w-md mb-3 relative flex items-center justify-center">
+            {/* Center content */}
+            <div className="flex items-center gap-2 px-4 bg-black/2 backdrop-blur-sm rounded-full py-1">
+              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H2a1 1 0 001-1V4a1 1 0 011-1h3a1 1 0 001-1v-.5z" />
+              </svg>
+              <span className="text-white font-medium">Handles</span>
+              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H2a1 1 0 001-1V4a1 1 0 011-1h3a1 1 0 001-1v-.5z" />
+              </svg>
+            </div>
+            
+            {/* Horizontal line */}
+            <div className="absolute inset-x-0 h-0.5 bg-gray-300/30 -z-10"></div>
+          </div>
 
           {/* Links */}
           <div className="w-full max-w-md space-y-2">
@@ -598,18 +636,18 @@ export default function DashboardPage() {
                 className="bg-white/90 backdrop-blur-md rounded-2xl p-3 flex items-center relative"
               >
                 {/* Icon on the left - using actual favicon */}
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-gray-100">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-gray-100">
                   <img 
                     src={`https://www.google.com/s2/favicons?domain=${new URL(link.url).hostname}&sz=128`}
                     alt={link.title}
-                    className="w-8 h-8 object-contain"
+                    className="w-6 h-6 object-contain"
                     onError={(e) => {
                       // Fallback to custom icon if favicon fails to load
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
                       const parent = target.parentElement;
                       if (parent) {
-                        parent.className = `w-10 h-10 ${getLinkIconBgColor(link.url)} rounded-lg flex items-center justify-center flex-shrink-0`;
+                        parent.className = `w-8 h-8 ${getLinkIconBgColor(link.url)} rounded-lg flex items-center justify-center flex-shrink-0`;
                         parent.innerHTML = '';
                         const iconContainer = document.createElement('div');
                         parent.appendChild(iconContainer);
@@ -626,7 +664,7 @@ export default function DashboardPage() {
                   rel="noopener noreferrer"
                   className="flex-1 text-center"
                 >
-                  <div className="text-black font-semibold">{link.title}</div>
+                  <div className="text-black font-semibold text-sm">{link.title}</div>
                 </a>
                 
                 {/* Three-dot menu on the right */}
@@ -646,7 +684,7 @@ export default function DashboardPage() {
                   }}
                   className="text-gray-400 hover:text-gray-600 p-1 flex-shrink-0"
                 >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
                   </svg>
                 </button>
@@ -664,6 +702,7 @@ export default function DashboardPage() {
             image={avatarToCrop}
             onCropComplete={handleAvatarCropComplete}
             onCancel={handleAvatarCropCancel}
+            onSkip={handleAvatarSkipCrop}
             aspect={1}
           />
         )}

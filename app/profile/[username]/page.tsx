@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useBackground } from '@/hooks/useBackground';
+import { useTheme } from '@/hooks/useTheme';
 import { getLinkIcon, getLinkIconBgColor } from '@/utils/linkIcons';
 import Image from 'next/image';
 import api from '@/lib/api';
@@ -36,11 +37,18 @@ export default function ProfilePage() {
   const username = params.username as string;
   const currentUser = useAuthStore((state) => state.user);
   const { background } = useBackground();
+  const { theme } = useTheme();
   const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
   const [links, setLinks] = useState<Link[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [showFollowersModal, setShowFollowersModal] = useState(false);
+  const [showFollowingModal, setShowFollowingModal] = useState(false);
+  const [followers, setFollowers] = useState<any[]>([]);
+  const [following, setFollowing] = useState<any[]>([]);
+  const [followersLoading, setFollowersLoading] = useState(false);
+  const [followingLoading, setFollowingLoading] = useState(false);
 
   useEffect(() => {
     // Wait a bit for auth store to rehydrate from localStorage
@@ -194,6 +202,46 @@ export default function ProfilePage() {
     }
   };
 
+  const fetchFollowers = async () => {
+    if (!profileUser) return;
+    setFollowersLoading(true);
+    try {
+      const targetUserId = profileUser._id || profileUser.id;
+      const response = await api.get(`/follows/followers/${targetUserId}`);
+      setFollowers(response.data.followers || []);
+    } catch (error) {
+      console.error('Failed to fetch followers:', error);
+      toast.error('Failed to load followers');
+    } finally {
+      setFollowersLoading(false);
+    }
+  };
+
+  const fetchFollowing = async () => {
+    if (!profileUser) return;
+    setFollowingLoading(true);
+    try {
+      const targetUserId = profileUser._id || profileUser.id;
+      const response = await api.get(`/follows/following/${targetUserId}`);
+      setFollowing(response.data.following || []);
+    } catch (error) {
+      console.error('Failed to fetch following:', error);
+      toast.error('Failed to load following');
+    } finally {
+      setFollowingLoading(false);
+    }
+  };
+
+  const handleShowFollowers = () => {
+    setShowFollowersModal(true);
+    fetchFollowers();
+  };
+
+  const handleShowFollowing = () => {
+    setShowFollowingModal(true);
+    fetchFollowing();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -228,28 +276,28 @@ export default function ProfilePage() {
         <div className="flex justify-between items-start p-6">
           <button 
             onClick={handleBack}
-            className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center hover:bg-black/50 transition"
+            className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center hover:bg-black/50 transition"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           
           <button 
             onClick={handleShare}
-            className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center hover:bg-black/50 transition"
+            className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center hover:bg-black/50 transition"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
             </svg>
           </button>
         </div>
 
         {/* Profile Section */}
-        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
+        <div className="flex-1 flex flex-col items-center justify-start px-6 pb-32 pt-4">
           {/* Avatar */}
-          <div className="relative mb-6">
-            <div className="w-40 h-40 rounded-full border-4 border-white/20 overflow-hidden bg-gray-800">
+          <div className="relative mb-4">
+            <div className="w-28 h-28 rounded-full border-4 border-white/20 overflow-hidden bg-gray-800">
               <Image
                 src={profileUser.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
                 alt={profileUser.displayName || profileUser.name}
@@ -267,18 +315,23 @@ export default function ProfilePage() {
           {/* Name and Username */}
           <div className="text-center mb-2">
             <div className="flex items-center justify-center gap-2 mb-1">
-              <h1 className="text-3xl font-bold">{profileUser.displayName || profileUser.name}</h1>
+              <h1 className="text-xl font-bold">{profileUser.displayName || profileUser.name}</h1>
               <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
             </div>
             {profileUser.username && (
-              <p className="text-gray-300 text-lg">@{profileUser.username}</p>
+              <p className="text-gray-300 text-base">@{profileUser.username}</p>
             )}
           </div>
 
+          {/* Bio */}
+          <p className="text-center text-white/90 text-sm max-w-md mb-6 px-4">
+            {profileUser.bio || 'No bio yet.'}
+          </p>
+
           {/* Follow Button and Stats */}
-          <div className="flex items-center gap-6 mb-6">
+          <div className="flex items-center gap-6 mb-8">
             <button
               onClick={handleFollowToggle}
               disabled={followLoading}
@@ -294,21 +347,22 @@ export default function ProfilePage() {
               {followLoading ? 'Loading...' : (isFollowing ? 'Unfollow' : 'Follow')}
             </button>
 
-            <div className="text-center">
-              <div className="text-2xl font-bold">{profileUser.followers?.length || 0}</div>
+            <button
+              onClick={handleShowFollowers}
+              className="text-center hover:opacity-80 transition cursor-pointer"
+            >
+              <div className="text-xl font-bold">{profileUser.followers?.length || 0}</div>
               <div className="text-gray-300 text-xs uppercase tracking-wide">Followers</div>
-            </div>
+            </button>
 
-            <div className="text-center">
-              <div className="text-2xl font-bold">{profileUser.following?.length || 0}</div>
+            <button
+              onClick={handleShowFollowing}
+              className="text-center hover:opacity-80 transition cursor-pointer"
+            >
+              <div className="text-xl font-bold">{profileUser.following?.length || 0}</div>
               <div className="text-gray-300 text-xs uppercase tracking-wide">Following</div>
-            </div>
+            </button>
           </div>
-
-          {/* Bio */}
-          <p className="text-center text-white/90 max-w-md mb-8 px-4">
-            {profileUser.bio || 'No bio yet.'}
-          </p>
 
           {/* TarpUp Button */}
           <button 
@@ -316,28 +370,62 @@ export default function ProfilePage() {
               const targetUserId = profileUser._id || profileUser.id;
               router.push(`/chat/${targetUserId}`);
             }}
-            className="w-full max-w-md bg-black/40 backdrop-blur-md border border-white/20 rounded-2xl py-4 px-6 flex items-center justify-center gap-2 hover:bg-black/60 transition mb-4"
+            className={`w-full max-w-md ${theme === 'dark' ? 'bg-black/30 border-white/20 hover:bg-black/50' : 'bg-white/30 border-gray-300 hover:bg-white/50'} backdrop-blur-md border rounded-2xl py-3 px-6 flex items-center justify-center gap-2 transition mb-3`}
           >
-            <span className="font-semibold">Click to TarpUp {profileUser.displayName || profileUser.name}</span>
+            <span className="text-[12px]">
+              Click to TarpUp <span className="font-bold">{profileUser.displayName || profileUser.name}</span>
+            </span>
+            <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+            </svg>
           </button>
 
+          {/* Handles Divider */}
+          <div className="w-full max-w-md mb-3 relative flex items-center justify-center">
+            {/* Center content */}
+            <div className="flex items-center gap-2 px-4 bg-black/2 backdrop-blur-sm rounded-full py-1">
+              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H2a1 1 0 001-1V4a1 1 0 011-1h3a1 1 0 001-1v-.5z" />
+              </svg>
+              <span className="text-white font-medium">Handles</span>
+              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H2a1 1 0 001-1V4a1 1 0 011-1h3a1 1 0 001-1v-.5z" />
+              </svg>
+            </div>
+            
+            {/* Horizontal line */}
+            <div className="absolute inset-x-0 h-0.5 bg-gray-300/30 -z-10"></div>
+          </div>
+
           {/* Links */}
-          <div className="w-full max-w-md space-y-3">
+          <div className="w-full max-w-md space-y-2">
             {links.map((link) => (
               <a
                 key={link._id}
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-white/90 backdrop-blur-md rounded-2xl p-4 flex items-center gap-4 hover:bg-white transition"
+                className="bg-white/90 backdrop-blur-md rounded-2xl p-3 flex items-center hover:bg-white transition"
               >
-                <div className={`w-10 h-10 ${getLinkIconBgColor(link.url)} rounded-lg flex items-center justify-center`}>
-                  {getLinkIcon(link.url)}
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-gray-100">
+                  <img 
+                    src={`https://www.google.com/s2/favicons?domain=${new URL(link.url).hostname}&sz=128`}
+                    alt={link.title}
+                    className="w-6 h-6 object-contain"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const parent = target.parentElement;
+                      if (parent) {
+                        parent.className = `w-8 h-8 ${getLinkIconBgColor(link.url)} rounded-lg flex items-center justify-center flex-shrink-0`;
+                      }
+                    }}
+                  />
                 </div>
-                <div className="flex-1">
-                  <div className="text-black font-semibold">{link.title}</div>
+                <div className="flex-1 text-center">
+                  <div className="text-black font-semibold text-sm">{link.title}</div>
                 </div>
-                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
               </a>
@@ -345,6 +433,83 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Followers Modal */}
+      {showFollowersModal && (
+        <div className={`fixed inset-0 ${theme === 'dark' ? 'bg-black/60' : 'bg-black/40'} backdrop-blur-sm z-50 flex items-end`} onClick={() => setShowFollowersModal(false)}>
+          <div 
+            className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>Followers</h2>
+                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{followers.length} people</p>
+                </div>
+                <button onClick={() => setShowFollowersModal(false)} className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-900'}`}>✕</button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 pb-6">
+              {followersLoading ? (
+                <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div></div>
+              ) : followers.length === 0 ? (
+                <div className="text-center py-12"><p className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>No followers yet</p></div>
+              ) : (
+                followers.map((follower) => (
+                  <div key={follower._id || follower.id} className={`flex items-center justify-between py-3 border-b ${theme === 'dark' ? 'border-gray-800' : 'border-gray-100'} last:border-0`}>
+                    <div className="flex items-center gap-3">
+                      <Image src={follower.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'} alt={follower.name} width={48} height={48} className="w-12 h-12 rounded-full object-cover" />
+                      <div>
+                        <div className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>{follower.displayName || follower.name}</div>
+                        {follower.username && <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>@{follower.username}</div>}
+                      </div>
+                    </div>
+                    <button onClick={() => { if (follower.username) { setShowFollowersModal(false); router.push(`/${follower.username}`); } else { toast.error('User has no username'); } }} className="text-blue-600 font-medium text-sm hover:text-blue-700">View</button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Following Modal */}
+      {showFollowingModal && (
+        <div className={`fixed inset-0 ${theme === 'dark' ? 'bg-black/60' : 'bg-black/40'} backdrop-blur-sm z-50 flex items-end`} onClick={() => setShowFollowingModal(false)}>
+          <div className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up`} onClick={(e) => e.stopPropagation()}>
+            <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>Following</h2>
+                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{following.length} people</p>
+                </div>
+                <button onClick={() => setShowFollowingModal(false)} className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-900'}`}>✕</button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 pb-6">
+              {followingLoading ? (
+                <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div></div>
+              ) : following.length === 0 ? (
+                <div className="text-center py-12"><p className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Not following anyone yet</p></div>
+              ) : (
+                following.map((user) => (
+                  <div key={user._id || user.id} className={`flex items-center justify-between py-3 border-b ${theme === 'dark' ? 'border-gray-800' : 'border-gray-100'} last:border-0`}>
+                    <div className="flex items-center gap-3">
+                      <Image src={user.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'} alt={user.name} width={48} height={48} className="w-12 h-12 rounded-full object-cover" />
+                      <div>
+                        <div className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>{user.displayName || user.name}</div>
+                        {user.username && <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>@{user.username}</div>}
+                      </div>
+                    </div>
+                    <button onClick={() => { if (user.username) { setShowFollowingModal(false); router.push(`/${user.username}`); } else { toast.error('User has no username'); } }} className="text-blue-600 font-medium text-sm hover:text-blue-700">View</button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
