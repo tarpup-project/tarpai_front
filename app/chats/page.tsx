@@ -13,7 +13,16 @@ import BottomNav from '@/components/BottomNav';
 
 interface Conversation {
   id: string;
-  participant: {
+  isGroup?: boolean;
+  groupName?: string;
+  participants?: Array<{
+    _id: string;
+    name: string;
+    displayName: string;
+    username: string;
+    avatar: string;
+  }>;
+  participant?: {
     _id: string;
     name: string;
     displayName: string;
@@ -24,6 +33,13 @@ interface Conversation {
     content: string;
     type?: string;
     createdAt: string;
+    sender?: {
+      _id: string;
+      name: string;
+      displayName?: string;
+      username: string;
+      avatar: string;
+    };
   };
   unreadCount: number;
   lastActivity: string;
@@ -88,6 +104,7 @@ export default function ChatsPage() {
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [followers, setFollowers] = useState<Follower[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [activeUsers, setActiveUsers] = useState<{ [conversationId: string]: { [participantId: string]: boolean } }>({});
   const [channels, setChannels] = useState<Channel[]>([]);
   const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
@@ -203,22 +220,30 @@ export default function ChatsPage() {
       const response = await api.get('/chat/conversations');
       console.log('Raw conversations:', response.data);
       
-      // Deduplicate conversations by participant ID
+      // Deduplicate conversations by participant ID (only for direct messages)
       const uniqueConversations = response.data.reduce((acc: Conversation[], conv: Conversation) => {
-        const participantId = conv.participant._id;
-        const existingIndex = acc.findIndex(c => c.participant._id === participantId);
-        
-        if (existingIndex === -1) {
-          // New participant, add conversation
+        if (conv.isGroup) {
+          // Always add group conversations
           acc.push(conv);
         } else {
-          // Duplicate participant, keep the one with more recent activity
-          const existing = acc[existingIndex];
-          const existingDate = new Date(existing.lastActivity).getTime();
-          const newDate = new Date(conv.lastActivity).getTime();
-          
-          if (newDate > existingDate) {
-            acc[existingIndex] = conv;
+          // Deduplicate direct messages by participant ID
+          const participantId = conv.participant?._id;
+          if (participantId) {
+            const existingIndex = acc.findIndex(c => !c.isGroup && c.participant?._id === participantId);
+            
+            if (existingIndex === -1) {
+              // New participant, add conversation
+              acc.push(conv);
+            } else {
+              // Duplicate participant, keep the one with more recent activity
+              const existing = acc[existingIndex];
+              const existingDate = new Date(existing.lastActivity).getTime();
+              const newDate = new Date(conv.lastActivity).getTime();
+              
+              if (newDate > existingDate) {
+                acc[existingIndex] = conv;
+              }
+            }
           }
         }
         
@@ -237,11 +262,6 @@ export default function ChatsPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const checkActiveUsers = async () => {
-    if (conversations.length === 0) return;
-    checkActiveUsersForConversations(conversations);
   };
 
   const checkActiveUsersForConversations = async (convs: Conversation[]) => {
@@ -375,18 +395,50 @@ export default function ChatsPage() {
     }
   };
 
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUsers(prev => {
+      if (prev.includes(userId)) {
+        return prev.filter(id => id !== userId);
+      } else {
+        return [...prev, userId];
+      }
+    });
+  };
+
+  const handleStartChat = async () => {
+    if (selectedUsers.length === 0) {
+      toast.error('Please select at least one person');
+      return;
+    }
+
+    setShowNewChatModal(false);
+    
+    if (selectedUsers.length === 1) {
+      // Single user - direct message
+      window.location.href = `/chat/${selectedUsers[0]}`;
+    } else {
+      // Multiple users - create group
+      try {
+        const response = await api.post('/chat/group', {
+          participantIds: selectedUsers,
+        });
+        
+        toast.success(`Group created with ${selectedUsers.length} members`);
+        // Navigate to the group conversation
+        window.location.href = `/chat/${response.data.id}`;
+      } catch (error: any) {
+        console.error('Failed to create group:', error);
+        toast.error(error.response?.data?.message || 'Failed to create group');
+      }
+    }
+    
+    setSelectedUsers([]);
+  };
+
   const handleOpenNewChat = async () => {
     await fetchFollowers();
+    setSelectedUsers([]);
     setShowNewChatModal(true);
-  };
-
-  const handleStartChat = (userId: string) => {
-    setShowNewChatModal(false);
-    window.location.href = `/chat/${userId}`;
-  };
-
-  const handleChatNavigation = (userId: string) => {
-    window.location.href = `/chat/${userId}`;
   };
 
   const handleTabSwitch = (tab: 'chats' | 'channels' | 'broadcasts') => {
@@ -465,19 +517,33 @@ export default function ChatsPage() {
 
   return (
     <div 
-      className="min-h-screen text-white relative"
-      style={{
-        background: background 
-          ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${background})`
-          : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        backgroundAttachment: 'fixed',
-      }}
+      className={`min-h-screen relative ${
+        theme === 'light' ? 'text-black' : 'text-white'
+      }`}
+      style={
+        theme === 'light'
+          ? {
+              background: '#e6e6e6',
+            }
+          : theme === 'dark'
+          ? {
+              background: '#000000',
+            }
+          : {
+              background: background 
+                ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${background})`
+                : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundAttachment: 'fixed',
+            }
+      }
     >
       {/* Overlay */}
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div>
+      {theme === 'background' && (
+        <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div>
+      )}
 
       {/* Content */}
       <div className="relative z-10 min-h-screen flex flex-col pb-20">
@@ -497,16 +563,30 @@ export default function ChatsPage() {
               value={mainSearchQuery}
               onChange={(e) => setMainSearchQuery(e.target.value)}
               placeholder="Search..."
-              className={`w-full ${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-full pl-12 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-white/30`}
+              className={`w-full backdrop-blur-md border rounded-full pl-12 pr-4 py-3 placeholder-gray-400 focus:outline-none ${
+                theme === 'light' 
+                  ? 'bg-[#e6e6e6] border-gray-400 text-black focus:border-gray-500' 
+                  : 'bg-white/10 border-white/20 text-white focus:border-white/40'
+              }`}
             />
           </div>
 
           {/* Tabs */}
-          <div className={`flex gap-2 ${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md rounded-full p-1 mb-5`}>
+          <div className={`flex gap-2 backdrop-blur-md rounded-full p-1 mb-5 ${
+            theme === 'light' 
+              ? 'bg-[#e6e6e6] border border-gray-400' 
+              : 'bg-white/10 border border-white/20'
+          }`}>
             <button
               onClick={() => handleTabSwitch('chats')}
               className={`flex-1 py-2 px-4 rounded-full font-medium transition ${
-                activeTab === 'chats' ? 'bg-white text-black' : 'text-white hover:bg-white/10'
+                activeTab === 'chats' 
+                  ? theme === 'light'
+                    ? 'bg-black text-white'
+                    : 'bg-white/40 text-white'
+                  : theme === 'light'
+                    ? 'text-gray-500 hover:bg-gray-100'
+                    : 'text-white hover:bg-white/10'
               }`}
             >
               Chats
@@ -514,7 +594,13 @@ export default function ChatsPage() {
             <button
               onClick={() => handleTabSwitch('channels')}
               className={`flex-1 py-2 px-4 rounded-full font-medium transition ${
-                activeTab === 'channels' ? 'bg-white text-black' : 'text-white hover:bg-white/10'
+                activeTab === 'channels' 
+                  ? theme === 'light'
+                    ? 'bg-black text-white'
+                    : 'bg-white/40 text-white'
+                  : theme === 'light'
+                    ? 'text-gray-500 hover:bg-gray-100'
+                    : 'text-white hover:bg-white/10'
               }`}
             >
               Channels
@@ -522,7 +608,13 @@ export default function ChatsPage() {
             <button
               onClick={() => handleTabSwitch('broadcasts')}
               className={`flex-1 py-2 px-4 rounded-full font-medium transition ${
-                activeTab === 'broadcasts' ? 'bg-white text-black' : 'text-white hover:bg-white/10'
+                activeTab === 'broadcasts' 
+                  ? theme === 'light'
+                    ? 'bg-black text-white'
+                    : 'bg-white/40 text-white'
+                  : theme === 'light'
+                    ? 'text-gray-500 hover:bg-gray-100'
+                    : 'text-white hover:bg-white/10'
               }`}
             >
               Broadcasts
@@ -551,55 +643,117 @@ export default function ChatsPage() {
                     .filter(conversation => {
                       if (!mainSearchQuery.trim()) return true;
                       const searchLower = mainSearchQuery.toLowerCase();
-                      return (
-                        conversation.participant.name?.toLowerCase().includes(searchLower) ||
-                        conversation.participant.displayName?.toLowerCase().includes(searchLower) ||
-                        conversation.participant.username?.toLowerCase().includes(searchLower)
-                      );
+                      
+                      if (conversation.isGroup) {
+                        return conversation.groupName?.toLowerCase().includes(searchLower);
+                      } else {
+                        return (
+                          conversation.participant?.name?.toLowerCase().includes(searchLower) ||
+                          conversation.participant?.displayName?.toLowerCase().includes(searchLower) ||
+                          conversation.participant?.username?.toLowerCase().includes(searchLower)
+                        );
+                      }
                     })
                     .map((conversation) => {
-                    const isParticipantActive = activeUsers[conversation.id]?.[conversation.participant._id] || false;
+                    // For group chats, check if any participant is active
+                    const isAnyParticipantActive = conversation.isGroup 
+                      ? conversation.participants?.some(p => activeUsers[conversation.id]?.[p._id])
+                      : activeUsers[conversation.id]?.[conversation.participant?._id || ''] || false;
+                    
+                    const displayName = conversation.isGroup 
+                      ? conversation.groupName 
+                      : (conversation.participant?.displayName || conversation.participant?.name);
+                    
+                    // For group chats without messages, show "Group: Started a new chat"
+                    // For direct messages without messages, show "No messages yet"
+                    // For group chats with messages from others, show "SenderName: message"
+                    let lastMessageDisplay = '';
+                    if (conversation.lastMessage) {
+                      const messageContent = conversation.lastMessage.type === 'image' 
+                        ? (conversation.lastMessage.content && conversation.lastMessage.content !== 'Image' 
+                            ? `📷 ${conversation.lastMessage.content}` 
+                            : '📷 Photo')
+                        : conversation.lastMessage.content;
+                      
+                      // For group chats, prepend sender name if message is from someone else
+                      if (conversation.isGroup && conversation.lastMessage.sender) {
+                        const isOwnMessage = conversation.lastMessage.sender._id === currentUser?.id;
+                        if (isOwnMessage) {
+                          lastMessageDisplay = messageContent;
+                        } else {
+                          const senderName = conversation.lastMessage.sender.displayName || conversation.lastMessage.sender.name;
+                          lastMessageDisplay = `${senderName}: ${messageContent}`;
+                        }
+                      } else {
+                        lastMessageDisplay = messageContent;
+                      }
+                    } else {
+                      lastMessageDisplay = conversation.isGroup ? 'Group: Started a new chat' : 'No messages yet';
+                    }
+                    
+                    // Determine navigation target: user ID for direct messages, conversation ID for groups
+                    const navigationTarget = conversation.isGroup 
+                      ? conversation.id 
+                      : conversation.participant?._id;
+                    
+                    console.log('Conversation click:', {
+                      isGroup: conversation.isGroup,
+                      conversationId: conversation.id,
+                      participantId: conversation.participant?._id,
+                      navigationTarget,
+                      groupName: conversation.groupName,
+                    });
                     
                     return (
                       <div
                         key={conversation.id}
-                        onClick={() => handleChatNavigation(conversation.participant._id)}
-                        className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-2xl p-4 flex items-center gap-4 ${theme === 'dark' ? 'hover:bg-black/60' : 'hover:bg-white/20'} transition cursor-pointer`}
+                        onClick={() => {
+                          console.log('Navigating to:', `/chat/${navigationTarget}`);
+                          window.location.href = `/chat/${navigationTarget}`;
+                        }}
+                        className={`${theme === 'light' ? 'bg-white/10' : 'bg-white/10'} backdrop-blur-md border ${theme === 'light' ? 'border-white/20' : 'border-white/10'} rounded-2xl p-4 flex items-center gap-4 ${theme === 'light' ? 'hover:bg-white/20' : 'hover:bg-white/20'} transition cursor-pointer`}
                       >
                         <div className="relative">
-                          <Image
-                            src={conversation.participant.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
-                            alt={conversation.participant.name}
-                            width={50}
-                            height={50}
-                            className="w-12 h-12 rounded-full object-cover"
-                          />
-                          {isParticipantActive && (
+                          {conversation.isGroup ? (
+                            // Group icon on gray background
+                            <div className="w-12 h-12 bg-gray-600 rounded-full flex items-center justify-center">
+                              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                              </svg>
+                            </div>
+                          ) : (
+                            // User avatar for direct messages
+                            <Image
+                              src={conversation.participant?.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
+                              alt={displayName || 'Chat'}
+                              width={50}
+                              height={50}
+                              className="w-12 h-12 rounded-full object-cover"
+                            />
+                          )}
+                          {isAnyParticipantActive && (
                             <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-black"></div>
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold truncate">
-                            {conversation.participant.displayName || conversation.participant.name}
+                            {displayName}
                           </h3>
-                          <p className="text-sm text-gray-400 truncate">
-                            {conversation.lastMessage ? (
-                              conversation.lastMessage.type === 'image' ? (
-                                conversation.lastMessage.content && conversation.lastMessage.content !== 'Image' ? (
-                                  `📷 ${conversation.lastMessage.content}`
-                                ) : (
-                                  '📷 Photo'
-                                )
-                              ) : (
-                                conversation.lastMessage.content
-                              )
-                            ) : (
-                              'No messages yet'
-                            )}
-                          </p>
+                          {conversation.isGroup && !conversation.lastMessage ? (
+                            // Group chat with no messages - show "Group:" in blue
+                            <p className="text-sm truncate">
+                              <span className="text-blue-400">Group:</span>
+                              <span className={theme === 'light' ? 'text-gray-600' : 'text-gray-400'}> Started a new chat</span>
+                            </p>
+                          ) : (
+                            // Regular message display
+                            <p className={`text-sm truncate ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
+                              {lastMessageDisplay}
+                            </p>
+                          )}
                         </div>
                         <div className="flex flex-col items-end gap-1">
-                          <span className="text-xs text-gray-400">
+                          <span className={`text-xs ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
                             {formatMessageTime(conversation.lastActivity)}
                           </span>
                           {conversation.unreadCount > 0 && (
@@ -623,22 +777,24 @@ export default function ChatsPage() {
               {/* Create New Channel Button */}
               <div 
                 onClick={() => setShowCreateChannelModal(true)}
-                className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-2xl p-4 flex items-center gap-4 ${theme === 'dark' ? 'hover:bg-black/60' : 'hover:bg-white/20'} transition cursor-pointer mb-6`}
+                className={`${theme === 'light' ? 'bg-white/30 border-black/10' : 'bg-white/10 border-white/30'} backdrop-blur-md border rounded-2xl p-4 flex items-center gap-4 ${theme === 'light' ? 'hover:bg-white/20' : 'hover:bg-white/20'} transition cursor-pointer mb-6`}
               >
-                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                  theme === 'light' ? 'bg-pink-500' : 'bg-white/20'
+                }`}>
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-white">Create New Channel</h3>
-                  <p className="text-sm text-gray-400">Share updates with your followers</p>
+                  <h3 className={`font-semibold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>Create New Channel</h3>
+                  <p className={`text-sm ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>Share updates with your followers</p>
                 </div>
               </div>
 
               {/* Your Channels Section */}
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-white mb-4">YOUR CHANNELS</h3>
+                <h3 className={`text-lg font-semibold mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>YOUR CHANNELS</h3>
                 {channels.filter(channel => channel.owner._id === currentUser?.id).length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-gray-400">You haven't created any channels yet</p>
@@ -659,7 +815,11 @@ export default function ChatsPage() {
                       <div
                         key={channel.id}
                         onClick={() => handleChannelNavigation(channel.id)}
-                        className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-2xl p-4 flex items-center gap-4 ${theme === 'dark' ? 'hover:bg-black/60' : 'hover:bg-white/20'} transition cursor-pointer`}
+                        className={`backdrop-blur-md border rounded-2xl p-4 flex items-center gap-4 transition cursor-pointer ${
+                          theme === 'light' 
+                            ? 'bg-white/30 border-gray-300 hover:bg-gray-50' 
+                            : 'bg-white/10 border-white/30 hover:bg-white/20'
+                        }`}
                       >
                         <Image
                           src={channel.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
@@ -669,12 +829,12 @@ export default function ChatsPage() {
                           className="w-12 h-12 rounded-full object-cover"
                         />
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold truncate text-white">{channel.title}</h3>
-                          <p className="text-sm text-gray-400 truncate">{channel.subtitle}</p>
+                          <h3 className={`font-semibold truncate ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>{channel.title}</h3>
+                          <p className={`text-sm truncate ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>{channel.subtitle}</p>
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           <span className="text-xs text-blue-400 font-medium">Owner</span>
-                          <span className="text-xs text-gray-400">
+                          <span className={`text-xs ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
                             {channel.subscribersCount} subs
                           </span>
                         </div>
@@ -686,7 +846,7 @@ export default function ChatsPage() {
 
               {/* All Channels Section */}
               <div>
-                <h3 className="text-lg font-semibold text-white mb-4">ALL CHANNELS</h3>
+                <h3 className={`text-lg font-semibold mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>ALL CHANNELS</h3>
                 {channels.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-gray-400">No channels available</p>
@@ -706,7 +866,11 @@ export default function ChatsPage() {
                       <div
                         key={channel.id}
                         onClick={() => handleChannelNavigation(channel.id)}
-                        className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-2xl p-4 flex items-center gap-4 ${theme === 'dark' ? 'hover:bg-black/60' : 'hover:bg-white/20'} transition cursor-pointer`}
+                        className={`backdrop-blur-md border rounded-2xl p-4 flex items-center gap-4 transition cursor-pointer ${
+                          theme === 'light' 
+                            ? 'bg-white/30 border-gray-300 hover:bg-gray-50' 
+                            : 'bg-white/10 border-white/30 hover:bg-white/20'
+                        }`}
                       >
                         <Image
                           src={channel.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
@@ -716,16 +880,16 @@ export default function ChatsPage() {
                           className="w-12 h-12 rounded-full object-cover"
                         />
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold truncate text-white">{channel.title}</h3>
-                          <p className="text-sm text-gray-400 truncate">{channel.subtitle}</p>
+                          <h3 className={`font-semibold truncate ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>{channel.title}</h3>
+                          <p className={`text-sm truncate ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>{channel.subtitle}</p>
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           {channel.owner._id === currentUser?.id ? (
                             <span className="text-xs text-blue-400 font-medium">Owner</span>
                           ) : (
-                            <span className="text-xs text-gray-400">@{channel.owner.username}</span>
+                            <span className={`text-xs ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>@{channel.owner.username}</span>
                           )}
-                          <span className="text-xs text-gray-400">
+                          <span className={`text-xs ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
                             {channel.subscribersCount} subs
                           </span>
                         </div>
@@ -742,16 +906,22 @@ export default function ChatsPage() {
               {/* New Broadcast Button */}
               <div 
                 onClick={() => setShowBroadcastModal(true)}
-                className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-2xl p-4 flex items-center gap-4 ${theme === 'dark' ? 'hover:bg-black/60' : 'hover:bg-white/20'} transition cursor-pointer mb-6`}
+                className={`backdrop-blur-md border rounded-2xl p-4 flex items-center gap-4 transition cursor-pointer mb-6 ${
+                  theme === 'light' 
+                    ? 'bg-white/30 border-gray-300 hover:bg-gray-50' 
+                    : 'bg-white/10 border-white/30 hover:bg-white/20'
+                }`}
               >
-                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                  theme === 'light' ? 'bg-pink-500' : 'bg-white/20'
+                }`}>
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-white">New Broadcast</h3>
-                  <p className="text-sm text-gray-400">Send a message to all your followers</p>
+                  <h3 className={`font-semibold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>New Broadcast</h3>
+                  <p className={`text-sm ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>Send a message to all your followers</p>
                 </div>
               </div>
 
@@ -774,7 +944,7 @@ export default function ChatsPage() {
                   {/* Sent Broadcasts Section */}
                   {sentBroadcasts.length > 0 && (
                     <div>
-                      <h3 className="text-lg font-semibold text-white mb-4">SENT</h3>
+                      <h3 className={`text-lg font-semibold mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>SENT</h3>
                       <div className="space-y-3">
                         {sentBroadcasts
                           .filter(broadcast => {
@@ -785,14 +955,18 @@ export default function ChatsPage() {
                           .map((broadcast) => (
                           <div
                             key={broadcast._id}
-                            className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-2xl p-4`}
+                            className={`backdrop-blur-md border rounded-2xl p-4 ${
+                              theme === 'light' 
+                                ? 'bg-white/30 border-gray-300' 
+                                : 'bg-white/10 border-white/30'
+                            }`}
                           >
                             <div className="flex items-center justify-between mb-3">
-                              <span className="text-xs text-gray-400">
+                              <span className={`text-xs ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
                                 {new Date(broadcast.createdAt).toLocaleDateString()}
                               </span>
                             </div>
-                            <p className="text-white leading-relaxed mb-3">{broadcast.message}</p>
+                            <p className={`leading-relaxed mb-3 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>{broadcast.message}</p>
                             <div className="flex justify-end">
                               <span className="text-xs text-blue-400 font-medium flex items-center gap-1">
                                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -810,7 +984,7 @@ export default function ChatsPage() {
                   {/* Received Broadcasts Section */}
                   {receivedBroadcasts.length > 0 && (
                     <div>
-                      <h3 className="text-lg font-semibold text-white mb-4">RECEIVED</h3>
+                      <h3 className={`text-lg font-semibold mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>RECEIVED</h3>
                       <div className="space-y-3">
                         {receivedBroadcasts
                           .filter(broadcast => {
@@ -826,7 +1000,11 @@ export default function ChatsPage() {
                           .map((broadcast) => (
                           <div
                             key={broadcast._id}
-                            className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-2xl p-4`}
+                            className={`backdrop-blur-md border rounded-2xl p-4 ${
+                              theme === 'light' 
+                                ? 'bg-white/30 border-gray-300' 
+                                : 'bg-white/10 border-white/30'
+                            }`}
                           >
                             <div className="flex items-start gap-3 mb-3">
                               <Image
@@ -838,21 +1016,23 @@ export default function ChatsPage() {
                               />
                               <div className="flex-1">
                                 <div className="flex items-center justify-between mb-1">
-                                  <h3 className="font-semibold text-white">
+                                  <h3 className={`font-semibold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
                                     {broadcast.sender.displayName || broadcast.sender.name}
                                   </h3>
-                                  <span className="text-xs text-gray-400">
+                                  <span className={`text-xs ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
                                     {new Date(broadcast.createdAt).toLocaleDateString()}
                                   </span>
                                 </div>
                                 {broadcast.sender.username && (
-                                  <p className="text-sm text-gray-400 mb-2">@{broadcast.sender.username}</p>
+                                  <p className={`text-sm mb-2 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>@{broadcast.sender.username}</p>
                                 )}
                               </div>
                             </div>
-                            <p className="text-white leading-relaxed">{broadcast.message}</p>
+                            <p className={`leading-relaxed ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>{broadcast.message}</p>
                             <div className="mt-3 flex justify-end">
-                              <span className="text-xs text-green-400 font-medium flex items-center gap-1">
+                              <span className={`text-xs font-medium flex items-center gap-1 ${
+                                theme === 'light' ? 'text-green-700' : 'text-green-400'
+                              }`}>
                                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                 </svg>
@@ -875,7 +1055,11 @@ export default function ChatsPage() {
       {activeTab === 'chats' && (
         <button
           onClick={handleOpenNewChat}
-          className={`fixed bottom-24 right-6 w-14 h-14 ${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 ${theme === 'dark' ? 'hover:bg-black/60' : 'hover:bg-white/20'} z-30`}
+          className={`fixed bottom-24 right-6 w-14 h-14 backdrop-blur-md border rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 z-30 ${
+            theme === 'light' 
+              ? 'bg-pink-500 hover:bg-pink-600 border-pink-500' 
+              : 'bg-white/20 border-white/10 hover:bg-white/30'
+          }`}
         >
           <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -887,15 +1071,15 @@ export default function ChatsPage() {
       {showCreateChannelModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowCreateChannelModal(false)}>
           <div 
-            className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up`}
+            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between mb-4">
-                <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>Create New Channel</h2>
+                <h2 className="text-xl font-bold text-black">Create New Channel</h2>
                 <button
                   onClick={() => setShowCreateChannelModal(false)}
-                  className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-900'}`}
+                  className="text-gray-400 hover:text-gray-600"
                 >
                   ✕
                 </button>
@@ -906,11 +1090,11 @@ export default function ChatsPage() {
               <div className="space-y-4">
                 {/* Avatar Selection */}
                 <div>
-                  <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                     Channel Avatar
                   </label>
                   <div className="flex items-center gap-4">
-                    <div className={`w-16 h-16 ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'} rounded-full flex items-center justify-center overflow-hidden`}>
+                    <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
                       {channelForm.avatar ? (
                         <Image
                           src={URL.createObjectURL(channelForm.avatar)}
@@ -921,7 +1105,7 @@ export default function ChatsPage() {
                           unoptimized
                         />
                       ) : (
-                        <svg className={`w-8 h-8 ${theme === 'dark' ? 'text-gray-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                       )}
@@ -935,7 +1119,7 @@ export default function ChatsPage() {
                     />
                     <button
                       onClick={() => channelFileInputRef.current?.click()}
-                      className={`px-4 py-2 ${theme === 'dark' ? 'bg-gray-800 text-gray-200 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} rounded-lg transition`}
+                      className="px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg transition text-sm"
                     >
                       Select Image
                     </button>
@@ -944,7 +1128,7 @@ export default function ChatsPage() {
 
                 {/* Title */}
                 <div>
-                  <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                     Channel Title
                   </label>
                   <input
@@ -952,13 +1136,13 @@ export default function ChatsPage() {
                     value={channelForm.title}
                     onChange={(e) => setChannelForm(prev => ({ ...prev, title: e.target.value }))}
                     placeholder="My Updates"
-                    className={`w-full px-4 py-3 border ${theme === 'dark' ? 'border-gray-700 bg-gray-800 text-white placeholder-gray-500' : 'border-gray-300 bg-white text-black placeholder-gray-400'} rounded-lg focus:outline-none focus:ring-2 ${theme === 'dark' ? 'focus:ring-white' : 'focus:ring-black'}`}
+                    className="w-full px-3 py-2 border border-gray-200 bg-gray-100 text-black text-sm placeholder-gray-400 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-300"
                   />
                 </div>
 
                 {/* Subtitle */}
                 <div>
-                  <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                     Channel Subtitle
                   </label>
                   <input
@@ -966,17 +1150,17 @@ export default function ChatsPage() {
                     value={channelForm.subtitle}
                     onChange={(e) => setChannelForm(prev => ({ ...prev, subtitle: e.target.value }))}
                     placeholder="Official updates from me"
-                    className={`w-full px-4 py-3 border ${theme === 'dark' ? 'border-gray-700 bg-gray-800 text-white placeholder-gray-500' : 'border-gray-300 bg-white text-black placeholder-gray-400'} rounded-lg focus:outline-none focus:ring-2 ${theme === 'dark' ? 'focus:ring-white' : 'focus:ring-black'}`}
+                    className="w-full px-3 py-2 border border-gray-200 bg-gray-100 text-black text-sm placeholder-gray-400 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-300"
                   />
                 </div>
               </div>
             </div>
 
-            <div className={`p-6 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div className="p-6 border-t border-gray-200">
               <button
                 onClick={handleCreateChannel}
                 disabled={creatingChannel || !channelForm.title.trim() || !channelForm.subtitle.trim() || !channelForm.avatar}
-                className={`w-full ${theme === 'dark' ? 'bg-white text-black hover:bg-gray-200' : 'bg-black text-white hover:bg-gray-800'} py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed`}
+                className="w-full bg-black text-white py-3 rounded-2xl text-sm font-semibold hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {creatingChannel ? 'Creating...' : 'Create Channel'}
               </button>
@@ -989,7 +1173,7 @@ export default function ChatsPage() {
       {showBroadcastModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowBroadcastModal(false)}>
           <div 
-            className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-slide-up`}
+            className={`bg-white rounded-t-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-slide-up`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -1066,7 +1250,10 @@ export default function ChatsPage() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-2xl font-bold text-black">New Message</h2>
                 <button
-                  onClick={() => setShowNewChatModal(false)}
+                  onClick={() => {
+                    setShowNewChatModal(false);
+                    setSelectedUsers([]);
+                  }}
                   className="text-gray-400 hover:text-gray-900"
                 >
                   ✕
@@ -1098,7 +1285,7 @@ export default function ChatsPage() {
                   {filteredFollowers.map((follower) => (
                     <div
                       key={follower._id}
-                      onClick={() => handleStartChat(follower._id)}
+                      onClick={() => toggleUserSelection(follower._id)}
                       className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-100 cursor-pointer transition"
                     >
                       <Image
@@ -1114,10 +1301,32 @@ export default function ChatsPage() {
                           <p className="text-sm text-gray-500">@{follower.username}</p>
                         )}
                       </div>
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
+                        selectedUsers.includes(follower._id) 
+                          ? 'bg-black border-black' 
+                          : 'border-gray-300'
+                      }`}>
+                        {selectedUsers.includes(follower._id) && (
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Start Chat Button */}
+            <div className="p-4 border-t border-gray-200">
+              <button
+                onClick={handleStartChat}
+                disabled={selectedUsers.length === 0}
+                className="w-full bg-black text-white py-4 rounded-full font-semibold hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Start Chat {selectedUsers.length > 0 && `(${selectedUsers.length})`}
+              </button>
             </div>
           </div>
         </div>

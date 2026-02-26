@@ -1,8 +1,29 @@
 @import "tailwindcss";
 
+/* 
+  Global Theme Colors
+  Edit these values to change colors across the entire app
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Light Mode Colors */
+  --light-background: #e6e6e6;
+  --light-background-overlay: rgba(230, 230, 230, 0.8);
+  --light-text: #000000;
+  --light-text-secondary: #666666;
+  
+  /* Dark Mode Colors */
+  --dark-background: #000000;
+  --dark-background-overlay: rgba(0, 0, 0, 0.8);
+  --dark-text: #ffffff;
+  --dark-text-secondary: #999999;
+  
+  /* Background Mode (Custom Image) Colors */
+  --background-overlay: rgba(0, 0, 0, 0.4);
+  --background-overlay-blur: rgba(0, 0, 0, 0.3);
+  
+  /* Default values for body */
+  --background: var(--light-background);
+  --foreground: var(--light-text);
 }
 
 @theme inline {
@@ -14,8 +35,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: var(--dark-background);
+    --foreground: var(--dark-text);
   }
 }
 

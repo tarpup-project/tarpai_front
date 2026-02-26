@@ -39,8 +39,16 @@ export default function BottomNav() {
           <span className="text-xs">Home</span>
         </button>
         
-        <button className="flex flex-col items-center gap-1 text-gray-400 hover:text-white">
-          <Image src="/logo.png" alt="TarpAI" width={24} height={24} className="w-6 h-6" />
+        <button 
+          className="flex flex-col items-center gap-1 text-gray-400 hover:text-white"
+        >
+          <Image 
+            src="/logo.png" 
+            alt="TarpAI" 
+            width={24} 
+            height={24} 
+            className="w-6 h-6 brightness-[0.6] grayscale"
+          />
           <span className="text-xs">TarpAI</span>
         </button>
         

@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useBackground } from '@/hooks/useBackground';
+import { useTheme } from '@/hooks/useTheme';
 import Image from 'next/image';
 import api from '@/lib/api';
 import { WS_URL } from '@/config/api.config';
@@ -33,13 +34,23 @@ interface ChatUser {
   avatar: string;
 }
 
+interface GroupInfo {
+  id: string;
+  isGroup: boolean;
+  groupName: string;
+  participants: ChatUser[];
+}
+
 export default function ChatPage() {
   const router = useRouter();
   const params = useParams();
-  const userId = params.userId as string;
+  const userId = params.userId as string; // Could be userId or conversationId
   const currentUser = useAuthStore((state) => state.user);
   const { background } = useBackground();
+  const { theme } = useTheme();
   const [chatUser, setChatUser] = useState<ChatUser | null>(null);
+  const [groupInfo, setGroupInfo] = useState<GroupInfo | null>(null);
+  const [isGroupChat, setIsGroupChat] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -58,6 +69,8 @@ export default function ChatPage() {
   const [showCropper, setShowCropper] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [showChatMenu, setShowChatMenu] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -113,15 +126,62 @@ export default function ChatPage() {
 
   const initializeChat = async () => {
     try {
-      // Fetch the other user's details
-      const userResponse = await api.get(`/users/${userId}`);
-      setChatUser(userResponse.data);
+      let conversationId: string;
+      let isGroup = false;
+      
+      console.log('=== INITIALIZING CHAT ===');
+      console.log('userId param:', userId);
+      
+      // First, try to fetch as a user ID (direct message)
+      try {
+        console.log('Attempting to fetch as user ID...');
+        const userResponse = await api.get(`/users/${userId}`);
+        console.log('User found:', userResponse.data);
+        setChatUser(userResponse.data);
+        setIsGroupChat(false);
 
-      // Create or get conversation
-      const conversationResponse = await api.post('/chat/conversations', {
-        participantId: userId,
-      });
-      const conversationId = conversationResponse.data.id;
+        // Create or get conversation
+        console.log('Creating/getting conversation with user...');
+        const conversationResponse = await api.post('/chat/conversations', {
+          participantId: userId,
+        });
+        console.log('Conversation response:', conversationResponse.data);
+        conversationId = conversationResponse.data.id;
+        isGroup = false;
+      } catch (userError: any) {
+        console.log('Failed to fetch as user:', userError.response?.status, userError.response?.data);
+        // If fetching as user fails, try as conversation ID (group chat)
+        try {
+          console.log('Attempting to fetch as conversation ID...');
+          const convResponse = await api.get(`/chat/conversations/${userId}`);
+          console.log('Conversation found:', convResponse.data);
+          conversationId = convResponse.data.id;
+          
+          if (convResponse.data.isGroup) {
+            // Group chat
+            console.log('Setting up group chat...');
+            setIsGroupChat(true);
+            isGroup = true;
+            setGroupInfo({
+              id: convResponse.data.id,
+              isGroup: true,
+              groupName: convResponse.data.groupName,
+              participants: convResponse.data.participants,
+            });
+          } else {
+            // Direct message - set the other participant
+            console.log('Setting up direct message from conversation...');
+            setIsGroupChat(false);
+            isGroup = false;
+            setChatUser(convResponse.data.participant);
+          }
+        } catch (convError: any) {
+          console.error('Failed to initialize chat:', convError.response?.status, convError.response?.data);
+          toast.error('User or conversation not found');
+          router.push('/chats');
+          return;
+        }
+      }
 
       // Mark messages as read
       try {
@@ -140,36 +200,42 @@ export default function ChatPage() {
       socketRef.current = socket;
 
       socket.on('connect', () => {
-        console.log('Socket connected');
+        console.log('Socket connected, isGroup:', isGroup);
         // Join the conversation room and get existing viewers
         socket.emit('join_conversation', { conversationId }, (response: any) => {
           console.log('Join conversation response:', response);
-          if (response?.existingViewers && response.existingViewers.includes(userId)) {
+          // For direct messages, check if the other user is viewing
+          if (!isGroup && response?.existingViewers && response.existingViewers.includes(userId)) {
             setIsOnline(true);
           }
         });
         
-        // Check if the other user is viewing after 500ms
-        setTimeout(() => {
-          socket.emit('check_conversation_viewer', { conversationId, userId });
-        }, 500);
-        
-        // Check again after 2 seconds to catch late joiners
-        setTimeout(() => {
-          socket.emit('check_conversation_viewer', { conversationId, userId });
-        }, 2000);
+        // Only check for online status in direct messages, not group chats
+        if (!isGroup) {
+          // Check if the other user is viewing after 500ms
+          setTimeout(() => {
+            socket.emit('check_conversation_viewer', { conversationId, userId });
+          }, 500);
+          
+          // Check again after 2 seconds to catch late joiners
+          setTimeout(() => {
+            socket.emit('check_conversation_viewer', { conversationId, userId });
+          }, 2000);
+        }
       });
 
       socket.on('conversation_viewer_status', (data: { conversationId: string; userId: string; isViewing: boolean }) => {
         console.log('Conversation viewer status:', data);
-        if (data.conversationId === conversationId && data.userId === userId) {
+        // Only update online status for direct messages
+        if (!isGroup && data.conversationId === conversationId && data.userId === userId) {
           setIsOnline(data.isViewing);
         }
       });
 
       socket.on('user_joined_conversation', (data: { conversationId: string; userId: string }) => {
         console.log('User joined conversation:', data);
-        if (data.conversationId === conversationId && data.userId === userId) {
+        // Only update online status for direct messages
+        if (!isGroup && data.conversationId === conversationId && data.userId === userId) {
           setIsOnline(true);
         }
       });
@@ -590,30 +656,59 @@ export default function ChatPage() {
     );
   }
 
-  if (!chatUser) {
+  if (!chatUser && !groupInfo) {
     return null;
   }
 
   return (
     <div 
-      className="min-h-screen text-white flex flex-col relative"
-      style={{
-        background: background 
-          ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${background})`
-          : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        backgroundAttachment: 'fixed',
-      }}
+      className={`min-h-screen flex flex-col relative ${
+        theme === 'dark' ? 'text-white' : 'text-black'
+      }`}
+      style={
+        theme === 'dark'
+          ? {
+              background: '#000000',
+            }
+          : theme === 'light'
+          ? {
+              background: '#e6e6e6',
+            }
+          : {
+              background: background 
+                ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${background})`
+                : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundAttachment: 'fixed',
+            }
+      }
     >
       {/* Overlay for better text readability */}
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div>
+      {theme === 'background' && (
+        <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div>
+      )}
 
       {/* Content */}
       <div className="relative z-10 flex flex-col h-screen">
         {/* Header */}
-        <div className="bg-black/40 backdrop-blur-md border-b border-white/10 p-4 flex items-center gap-3">
+        <div 
+          className={`backdrop-blur-md border-b p-4 flex items-center gap-3 ${
+            theme === 'light' 
+              ? 'border-gray-300' 
+              : 'border-white/10'
+          }`}
+          style={
+            theme === 'light'
+              ? {
+                  background: 'linear-gradient(to bottom, #4a4a4a, #2d2d2d)',
+                }
+              : {
+                  background: 'rgba(0, 0, 0, 0.4)',
+                }
+          }
+        >
           {selectedMessages.size > 0 ? (
             <>
               {/* Selection Mode Header */}
@@ -627,7 +722,7 @@ export default function ChatPage() {
               </button>
 
               <div className="flex-1">
-                <h2 className="font-semibold">{selectedMessages.size} selected</h2>
+                <h2 className={`font-semibold ${theme === 'light' ? 'text-white' : 'text-white'}`}>{selectedMessages.size} selected</h2>
               </div>
 
               <button
@@ -651,24 +746,58 @@ export default function ChatPage() {
                 </svg>
               </button>
 
-              <Image
-                src={chatUser.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
-                alt={chatUser.name}
-                width={40}
-                height={40}
-                className="w-10 h-10 rounded-full object-cover"
-              />
+              {isGroupChat && groupInfo ? (
+                <>
+                  {/* Group Chat Header */}
+                  <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
 
-              <div className="flex-1">
-                <h2 className="font-semibold">{chatUser.displayName || chatUser.name}</h2>
-                {isOnline ? (
-                  <p className="text-xs text-gray-400">Online</p>
-                ) : (
-                  <p className="text-xs text-gray-400">Offline</p>
-                )}
-              </div>
+                  <div className="flex-1 min-w-0">
+                    <h2 className={`font-semibold truncate ${theme === 'light' ? 'text-white' : 'text-white'}`}>{groupInfo.groupName}</h2>
+                    <p className={`text-xs ${theme === 'light' ? 'text-gray-300' : 'text-gray-400'}`}>{groupInfo.participants.length} members</p>
+                  </div>
+                </>
+              ) : chatUser ? (
+                <>
+                  {/* Direct Message Header */}
+                  <Image
+                    src={chatUser.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
+                    alt={chatUser.name}
+                    width={40}
+                    height={40}
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
 
-              <button className="text-gray-300 hover:text-white">
+                  <div className="flex-1 min-w-0">
+                    <h2 className={`font-semibold truncate ${theme === 'light' ? 'text-white' : 'text-white'}`}>{chatUser.displayName || chatUser.name}</h2>
+                    {isOnline ? (
+                      <p className={`text-xs ${theme === 'light' ? 'text-gray-300' : 'text-gray-400'}`}>Online</p>
+                    ) : (
+                      <p className={`text-xs ${theme === 'light' ? 'text-gray-300' : 'text-gray-400'}`}>Offline</p>
+                    )}
+                  </div>
+                </>
+              ) : null}
+
+              <button 
+                onClick={(e) => {
+                  if (showChatMenu) {
+                    setShowChatMenu(false);
+                    setMenuPosition(null);
+                  } else {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setMenuPosition({
+                      top: rect.bottom + 4,
+                      right: window.innerWidth - rect.right
+                    });
+                    setShowChatMenu(true);
+                  }
+                }}
+                className={`${theme === 'light' ? 'text-white hover:text-gray-200' : 'text-gray-300 hover:text-white'}`}
+              >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                 </svg>
@@ -684,6 +813,11 @@ export default function ChatPage() {
             const isHighlighted = highlightedMessageId === message._id;
             const isSelected = selectedMessages.has(message._id);
             const isImageMessage = message.type === 'image' && message.fileUrl;
+            
+            // Get sender info for group chats
+            const messageSender = isGroupChat && groupInfo && !isOwn
+              ? groupInfo.participants.find(p => p._id === message.sender)
+              : null;
             
             return (
               <div
@@ -705,21 +839,30 @@ export default function ChatPage() {
                     )}
                   </div>
                 )}
-                <div
-                  onTouchStart={(e) => handleTouchStart(e, message)}
-                  onTouchMove={(e) => handleTouchMove(e, message._id, isOwn)}
-                  onTouchEnd={() => handleTouchEnd(message)}
-                  onClick={() => handleMessageClick(message._id)}
-                  style={{
-                    transform: swipedMessageId === message._id ? `translateX(${swipeOffset}px)` : 'none',
-                    transition: swipedMessageId === message._id && swipeOffset === 0 ? 'transform 0.2s ease-out' : 'none',
-                  }}
-                  className={`max-w-[70%] rounded-2xl ${isImageMessage ? 'p-1' : 'px-4 py-2'} relative ${
-                    isOwn
-                      ? 'bg-white text-black'
-                      : 'bg-black/60 backdrop-blur-md text-white border border-white/10'
-                  } ${isHighlighted ? 'ring-2 ring-blue-500 ring-opacity-50' : ''} ${isSelected ? 'ring-2 ring-blue-600' : ''}`}
-                >
+                <div className="flex flex-col items-start max-w-[70%]">
+                  {/* Show sender name in group chats for messages from others */}
+                  {isGroupChat && !isOwn && messageSender && (
+                    <span className={`text-xs ml-3 mb-1 ${theme === 'light' ? 'text-gray-700' : 'text-gray-400'}`}>
+                      {messageSender.displayName || messageSender.name}
+                    </span>
+                  )}
+                  <div
+                    onTouchStart={(e) => handleTouchStart(e, message)}
+                    onTouchMove={(e) => handleTouchMove(e, message._id, isOwn)}
+                    onTouchEnd={() => handleTouchEnd(message)}
+                    onClick={() => handleMessageClick(message._id)}
+                    style={{
+                      transform: swipedMessageId === message._id ? `translateX(${swipeOffset}px)` : 'none',
+                      transition: swipedMessageId === message._id && swipeOffset === 0 ? 'transform 0.2s ease-out' : 'none',
+                    }}
+                    className={`rounded-2xl ${isImageMessage ? 'p-1' : 'px-4 py-2'} relative ${
+                      isOwn
+                        ? 'bg-white text-black'
+                        : theme === 'light'
+                          ? 'bg-gray-800 text-white'
+                          : 'bg-white/10 backdrop-blur-md text-white border border-white/30'
+                    } ${isHighlighted ? 'ring-2 ring-blue-500 ring-opacity-50' : ''} ${isSelected ? 'ring-2 ring-blue-600' : ''}`}
+                  >
                   {message.replyTo && (
                     <div 
                       onClick={(e) => {
@@ -729,7 +872,13 @@ export default function ChatPage() {
                       className={`${isImageMessage ? 'mx-3 mt-2' : ''} mb-2 pl-3 border-l-4 ${isOwn ? 'border-green-600' : 'border-green-500'} py-1 cursor-pointer hover:opacity-80 transition`}
                     >
                       <p className={`text-xs font-semibold ${isOwn ? 'text-green-700' : 'text-green-400'}`}>
-                        {message.replyTo.sender === currentUser?.id ? 'You' : chatUser?.displayName || chatUser?.name}
+                        {message.replyTo.sender === currentUser?.id 
+                          ? 'You' 
+                          : isGroupChat && groupInfo
+                            ? groupInfo.participants.find(p => p._id === message.replyTo!.sender)?.displayName || 
+                              groupInfo.participants.find(p => p._id === message.replyTo!.sender)?.name || 
+                              'Unknown'
+                            : chatUser?.displayName || chatUser?.name}
                       </p>
                       <p className={`text-xs ${isOwn ? 'opacity-60' : 'opacity-70'} truncate`}>
                         {message.replyTo.content}
@@ -782,6 +931,7 @@ export default function ChatPage() {
                     </div>
                   )}
                 </div>
+                </div>
               </div>
             );
           })}
@@ -815,7 +965,11 @@ export default function ChatPage() {
 
         {/* Image Preview */}
         {imagePreview && (
-          <div className="bg-black/40 backdrop-blur-md border-t border-white/10 p-4">
+          <div className={`backdrop-blur-md border-t p-4 ${
+            theme === 'light' 
+              ? 'bg-white/90 border-gray-300' 
+              : 'bg-black/40 border-white/10'
+          }`}>
             <div className="relative inline-block">
               <Image
                 src={imagePreview}
@@ -837,7 +991,11 @@ export default function ChatPage() {
         )}
 
         {/* Input */}
-        <div className="bg-black/40 backdrop-blur-md border-t border-white/10 p-4">
+        <div className={`backdrop-blur-md border-t p-4 ${
+          theme === 'light' 
+            ? 'bg-white/10 border-gray-100' 
+            : 'bg-black/40 border-white/10'
+        }`}>
           <div className="flex items-center gap-2">
             <input
               ref={fileInputRef}
@@ -848,7 +1006,7 @@ export default function ChatPage() {
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-10 h-10 shrink-0 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition"
+              className="w-10 h-10 shrink-0 bg-black/50 rounded-full flex items-center justify-center hover:bg-white/20 transition"
             >
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -861,7 +1019,7 @@ export default function ChatPage() {
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
               disabled={uploadingImage}
-              className="flex-1 min-w-0 bg-black/40 backdrop-blur-md text-white rounded-full px-5 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-600 border border-white/10 placeholder-gray-400 disabled:opacity-50"
+              className="flex-1 min-w-0 bg-black/50 backdrop-blur-md text-white rounded-full px-5 py-2.5 focus:outline-none focus:ring-2 focus:ring-gray-600 border border-white/10 placeholder-gray-400 disabled:opacity-50"
             />
             <button
               onClick={handleSendMessage}
@@ -871,7 +1029,7 @@ export default function ChatPage() {
               {uploadingImage ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
               ) : (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-white rotate-320" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                 </svg>
               )}
@@ -889,6 +1047,59 @@ export default function ChatPage() {
           onSkip={handleSkipCrop}
           aspect={4 / 3}
         />
+      )}
+
+      {/* Chat Options Menu */}
+      {showChatMenu && menuPosition && (
+        <>
+          {/* Backdrop to close menu */}
+          <div 
+            className="fixed inset-0 z-[999]" 
+            onClick={() => {
+              setShowChatMenu(false);
+              setMenuPosition(null);
+            }}
+          ></div>
+          
+          {/* Menu */}
+          <div 
+            className={`fixed z-[1000] rounded-lg shadow-lg py-2 w-40 bg-gray-900 border border-gray-700`}
+            style={{
+              top: `${menuPosition.top}px`,
+              right: `${menuPosition.right}px`
+            }}
+          >
+            <button
+              onClick={() => {
+                setShowChatMenu(false);
+                setMenuPosition(null);
+                if (chatUser?.username) {
+                  router.push(`/${chatUser.username}`);
+                }
+              }}
+              className="w-full px-4 py-3 text-left flex items-center gap-3 text-sm text-white hover:bg-gray-800"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span className="font-medium">View Profile</span>
+            </button>
+            <button
+              onClick={() => {
+                setShowChatMenu(false);
+                setMenuPosition(null);
+                // Add report functionality here
+                alert('Report functionality to be implemented');
+              }}
+              className="w-full px-4 py-3 text-left text-red-500 flex items-center gap-3 text-sm hover:bg-gray-800"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span className="font-medium">Report</span>
+            </button>
+          </div>
+        </>
       )}
 
       {/* Image Preview Modal */}

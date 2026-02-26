@@ -256,19 +256,33 @@ export default function ProfilePage() {
 
   return (
     <div 
-      className="min-h-screen text-white relative overflow-hidden"
-      style={{
-        background: background 
-          ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${background})`
-          : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        backgroundAttachment: 'fixed',
-      }}
+      className={`min-h-screen relative overflow-hidden ${
+        theme === 'dark' ? 'text-white' : 'text-black'
+      }`}
+      style={
+        theme === 'dark'
+          ? {
+              background: '#000000',
+            }
+          : theme === 'light'
+          ? {
+              background: '#e6e6e6',
+            }
+          : {
+              background: background 
+                ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${background})`
+                : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundAttachment: 'fixed',
+            }
+      }
     >
       {/* Overlay for better text readability */}
-      <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"></div>
+      {theme === 'background' && (
+        <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"></div>
+      )}
 
       {/* Content */}
       <div className="relative z-10 min-h-screen flex flex-col">
@@ -276,18 +290,26 @@ export default function ProfilePage() {
         <div className="flex justify-between items-start p-6">
           <button 
             onClick={handleBack}
-            className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center hover:bg-black/50 transition"
+            className={`w-10 h-10 rounded-full backdrop-blur-md flex items-center justify-center transition ${
+              theme === 'light' 
+                ? 'bg-white/30 hover:bg-white/50' 
+                : 'bg-white/30 hover:bg-white/50'
+            }`}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`w-5 h-5 ${theme === 'light' ? 'text-black' : 'text-white'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           
           <button 
             onClick={handleShare}
-            className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center hover:bg-black/50 transition"
+            className={`w-10 h-10 rounded-full backdrop-blur-md flex items-center justify-center transition ${
+              theme === 'light' 
+                ? 'bg-white/30 hover:bg-white/50' 
+                : 'bg-white/30 hover:bg-white/50'
+            }`}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`w-5 h-5 ${theme === 'light' ? 'text-black' : 'text-white'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
             </svg>
           </button>
@@ -297,7 +319,9 @@ export default function ProfilePage() {
         <div className="flex-1 flex flex-col items-center justify-start px-6 pb-32 pt-4">
           {/* Avatar */}
           <div className="relative mb-4">
-            <div className="w-28 h-28 rounded-full border-4 border-white/20 overflow-hidden bg-gray-800">
+            <div className={`w-28 h-28 rounded-full border-4 overflow-hidden bg-gray-800 ${
+              theme === 'light' ? 'border-white' : 'border-white/20'
+            }`}>
               <Image
                 src={profileUser.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
                 alt={profileUser.displayName || profileUser.name}
@@ -315,18 +339,18 @@ export default function ProfilePage() {
           {/* Name and Username */}
           <div className="text-center mb-2">
             <div className="flex items-center justify-center gap-2 mb-1">
-              <h1 className="text-xl font-bold">{profileUser.displayName || profileUser.name}</h1>
+              <h1 className={`text-xl font-bold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>{profileUser.displayName || profileUser.name}</h1>
               <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
             </div>
             {profileUser.username && (
-              <p className="text-gray-300 text-base">@{profileUser.username}</p>
+              <p className={`text-base ${theme === 'light' ? 'text-gray-600' : 'text-gray-300'}`}>@{profileUser.username}</p>
             )}
           </div>
 
           {/* Bio */}
-          <p className="text-center text-white/90 text-sm max-w-md mb-6 px-4">
+          <p className={`text-center text-sm max-w-md mb-6 px-4 ${theme === 'light' ? 'text-gray-700' : 'text-white/90'}`}>
             {profileUser.bio || 'No bio yet.'}
           </p>
 
@@ -337,7 +361,9 @@ export default function ProfilePage() {
               disabled={followLoading}
               className={`px-8 py-2 rounded-full font-semibold transition disabled:opacity-50 flex items-center gap-2 ${
                 isFollowing
-                  ? 'bg-white/20 text-white hover:bg-white/30'
+                  ? theme === 'light'
+                    ? 'bg-gray-300 text-black hover:bg-gray-400 shadow-md'
+                    : 'bg-white/20 text-white hover:bg-white/30'
                   : 'bg-white text-black hover:bg-gray-200'
               }`}
             >
@@ -351,16 +377,16 @@ export default function ProfilePage() {
               onClick={handleShowFollowers}
               className="text-center hover:opacity-80 transition cursor-pointer"
             >
-              <div className="text-xl font-bold">{profileUser.followers?.length || 0}</div>
-              <div className="text-gray-300 text-xs uppercase tracking-wide">Followers</div>
+              <div className={`text-xl font-bold ${theme === 'light' ? 'text-black' : 'text-white'}`}>{profileUser.followers?.length || 0}</div>
+              <div className={`text-xs uppercase tracking-wide ${theme === 'light' ? 'text-gray-600' : 'text-gray-300'}`}>Followers</div>
             </button>
 
             <button
               onClick={handleShowFollowing}
               className="text-center hover:opacity-80 transition cursor-pointer"
             >
-              <div className="text-xl font-bold">{profileUser.following?.length || 0}</div>
-              <div className="text-gray-300 text-xs uppercase tracking-wide">Following</div>
+              <div className={`text-xl font-bold ${theme === 'light' ? 'text-black' : 'text-white'}`}>{profileUser.following?.length || 0}</div>
+              <div className={`text-xs uppercase tracking-wide ${theme === 'light' ? 'text-gray-600' : 'text-gray-300'}`}>Following</div>
             </button>
           </div>
 
@@ -370,7 +396,11 @@ export default function ProfilePage() {
               const targetUserId = profileUser._id || profileUser.id;
               router.push(`/chat/${targetUserId}`);
             }}
-            className={`w-full max-w-md ${theme === 'dark' ? 'bg-black/30 border-white/20 hover:bg-black/50' : 'bg-white/30 border-gray-300 hover:bg-white/50'} backdrop-blur-md border rounded-2xl py-3 px-6 flex items-center justify-center gap-2 transition mb-3`}
+            className={`w-full max-w-md backdrop-blur-md border rounded-2xl py-3 px-6 flex items-center justify-center gap-2 transition mb-3 ${
+              theme === 'light' 
+                ? 'bg-pink-500 hover:bg-pink-600 border-pink-500 text-white' 
+                : 'bg-white/30 border-white/20 hover:bg-white/50 text-white'
+            }`}
           >
             <span className="text-[12px]">
               Click to TarpUp <span className="font-bold">{profileUser.displayName || profileUser.name}</span>
@@ -384,17 +414,17 @@ export default function ProfilePage() {
           <div className="w-full max-w-md mb-3 relative flex items-center justify-center">
             {/* Center content */}
             <div className="flex items-center gap-2 px-4 bg-black/2 backdrop-blur-sm rounded-full py-1">
-              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <svg className={`w-5 h-5 ${theme === 'light' ? 'text-black' : 'text-white'}`} fill="currentColor" viewBox="0 0 20 20">
                 <path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H2a1 1 0 001-1V4a1 1 0 011-1h3a1 1 0 001-1v-.5z" />
               </svg>
-              <span className="text-white font-medium">Handles</span>
-              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <span className={`font-medium ${theme === 'light' ? 'text-black' : 'text-white'}`}>Handles</span>
+              <svg className={`w-5 h-5 ${theme === 'light' ? 'text-black' : 'text-white'}`} fill="currentColor" viewBox="0 0 20 20">
                 <path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H2a1 1 0 001-1V4a1 1 0 011-1h3a1 1 0 001-1v-.5z" />
               </svg>
             </div>
             
             {/* Horizontal line */}
-            <div className="absolute inset-x-0 h-0.5 bg-gray-300/30 -z-10"></div>
+            <div className={`absolute inset-x-0 h-0.5 -z-10 ${theme === 'light' ? 'bg-gray-400' : 'bg-gray-300/30'}`}></div>
           </div>
 
           {/* Links */}
@@ -405,7 +435,11 @@ export default function ProfilePage() {
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="bg-white/90 backdrop-blur-md rounded-2xl p-3 flex items-center hover:bg-white transition"
+                className={`backdrop-blur-md rounded-2xl p-3 flex items-center hover:bg-white transition ${
+                  theme === 'light' 
+                    ? 'bg-white/90 border-2 border-gray-300' 
+                    : 'bg-white/90'
+                }`}
               >
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-gray-100">
                   <img 
@@ -436,33 +470,33 @@ export default function ProfilePage() {
 
       {/* Followers Modal */}
       {showFollowersModal && (
-        <div className={`fixed inset-0 ${theme === 'dark' ? 'bg-black/60' : 'bg-black/40'} backdrop-blur-sm z-50 flex items-end`} onClick={() => setShowFollowersModal(false)}>
+        <div className={`fixed inset-0 ${theme === 'light' ? 'bg-black/40' : 'bg-black/60'} backdrop-blur-sm z-50 flex items-end`} onClick={() => setShowFollowersModal(false)}>
           <div 
-            className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up`}
+            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>Followers</h2>
-                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{followers.length} people</p>
+                  <h2 className="text-2xl font-bold text-black">Followers</h2>
+                  <p className="text-sm text-gray-500">{followers.length} people</p>
                 </div>
-                <button onClick={() => setShowFollowersModal(false)} className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-900'}`}>✕</button>
+                <button onClick={() => setShowFollowersModal(false)} className="text-gray-400 hover:text-gray-900">✕</button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-6 pb-6">
               {followersLoading ? (
                 <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div></div>
               ) : followers.length === 0 ? (
-                <div className="text-center py-12"><p className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>No followers yet</p></div>
+                <div className="text-center py-12"><p className="text-gray-500">No followers yet</p></div>
               ) : (
                 followers.map((follower) => (
-                  <div key={follower._id || follower.id} className={`flex items-center justify-between py-3 border-b ${theme === 'dark' ? 'border-gray-800' : 'border-gray-100'} last:border-0`}>
+                  <div key={follower._id || follower.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
                     <div className="flex items-center gap-3">
                       <Image src={follower.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'} alt={follower.name} width={48} height={48} className="w-12 h-12 rounded-full object-cover" />
                       <div>
-                        <div className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>{follower.displayName || follower.name}</div>
-                        {follower.username && <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>@{follower.username}</div>}
+                        <div className="font-semibold text-black">{follower.displayName || follower.name}</div>
+                        {follower.username && <div className="text-sm text-gray-500">@{follower.username}</div>}
                       </div>
                     </div>
                     <button onClick={() => { if (follower.username) { setShowFollowersModal(false); router.push(`/${follower.username}`); } else { toast.error('User has no username'); } }} className="text-blue-600 font-medium text-sm hover:text-blue-700">View</button>
@@ -477,29 +511,29 @@ export default function ProfilePage() {
       {/* Following Modal */}
       {showFollowingModal && (
         <div className={`fixed inset-0 ${theme === 'dark' ? 'bg-black/60' : 'bg-black/40'} backdrop-blur-sm z-50 flex items-end`} onClick={() => setShowFollowingModal(false)}>
-          <div className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up`} onClick={(e) => e.stopPropagation()}>
-            <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+          <div className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>Following</h2>
-                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{following.length} people</p>
+                  <h2 className="text-2xl font-bold text-black">Following</h2>
+                  <p className="text-sm text-gray-500">{following.length} people</p>
                 </div>
-                <button onClick={() => setShowFollowingModal(false)} className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-900'}`}>✕</button>
+                <button onClick={() => setShowFollowingModal(false)} className="text-gray-400 hover:text-gray-900">✕</button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-6 pb-6">
               {followingLoading ? (
                 <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div></div>
               ) : following.length === 0 ? (
-                <div className="text-center py-12"><p className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Not following anyone yet</p></div>
+                <div className="text-center py-12"><p className="text-gray-500">Not following anyone yet</p></div>
               ) : (
                 following.map((user) => (
-                  <div key={user._id || user.id} className={`flex items-center justify-between py-3 border-b ${theme === 'dark' ? 'border-gray-800' : 'border-gray-100'} last:border-0`}>
+                  <div key={user._id || user.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
                     <div className="flex items-center gap-3">
                       <Image src={user.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'} alt={user.name} width={48} height={48} className="w-12 h-12 rounded-full object-cover" />
                       <div>
-                        <div className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>{user.displayName || user.name}</div>
-                        {user.username && <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>@{user.username}</div>}
+                        <div className="font-semibold text-black">{user.displayName || user.name}</div>
+                        {user.username && <div className="text-sm text-gray-500">@{user.username}</div>}
                       </div>
                     </div>
                     <button onClick={() => { if (user.username) { setShowFollowingModal(false); router.push(`/${user.username}`); } else { toast.error('User has no username'); } }} className="text-blue-600 font-medium text-sm hover:text-blue-700">View</button>

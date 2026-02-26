@@ -3,10 +3,12 @@ import { useThemeStore } from '@/store/themeStore';
 export const useTheme = () => {
   const { theme } = useThemeStore();
   const isDark = theme === 'dark';
+  const isBackground = theme === 'background';
 
   return {
     theme,
     isDark,
+    isBackground,
     // Background colors
     bg: {
       primary: isDark ? 'bg-black' : 'bg-white',

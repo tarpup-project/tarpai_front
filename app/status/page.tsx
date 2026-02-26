@@ -310,19 +310,33 @@ export default function StatusPage() {
 
   return (
     <div 
-      className="min-h-screen text-white relative overflow-hidden"
-      style={{
-        background: background 
-          ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${background})`
-          : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        backgroundAttachment: 'fixed',
-      }}
+      className={`min-h-screen relative overflow-hidden ${
+        theme === 'light' ? 'text-black' : 'text-white'
+      }`}
+      style={
+        theme === 'light'
+          ? {
+              background: '#e6e6e6',
+            }
+          : theme === 'dark'
+          ? {
+              background: '#000000',
+            }
+          : {
+              background: background 
+                ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${background})`
+                : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundAttachment: 'fixed',
+            }
+      }
     >
       {/* Overlay */}
-      <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"></div>
+      {theme === 'background' && (
+        <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"></div>
+      )}
 
       {/* Content */}
       <div className="relative z-10 min-h-screen flex flex-col">
@@ -340,7 +354,7 @@ export default function StatusPage() {
               placeholder="Search users..."
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
-              className={`w-full ${theme === 'dark' ? 'bg-black/40 text-white placeholder-gray-400' : 'bg-white/40 text-black placeholder-gray-600'} backdrop-blur-md rounded-full pl-12 pr-12 py-3 focus:outline-none focus:ring-2 ${theme === 'dark' ? 'focus:ring-white/20' : 'focus:ring-gray-300'}`}
+              className={`w-full ${theme === 'light' ? 'bg-white/40 text-black placeholder-gray-600' : 'bg-white/10 border border-white/30 text-white placeholder-gray-400'} backdrop-blur-md rounded-full pl-12 pr-12 py-3 focus:outline-none focus:ring-2 ${theme === 'light' ? 'focus:ring-gray-300' : 'focus:ring-white/20'}`}
             />
             {searchQuery && (
               <button
@@ -356,7 +370,7 @@ export default function StatusPage() {
 
           {/* Search Results Dropdown */}
           {showSearchResults && (
-            <div className={`absolute top-full left-2 right-2 mt-2 ${theme === 'dark' ? 'bg-black/90' : 'bg-white/90'} backdrop-blur-md rounded-2xl shadow-lg max-h-80 overflow-y-auto z-20`}>
+            <div className={`absolute top-full left-2 right-2 mt-2 ${theme === 'light' ? 'bg-white/90' : 'bg-black/90'} backdrop-blur-md rounded-2xl shadow-lg max-h-80 overflow-y-auto z-20`}>
               {isSearching ? (
                 <div className="p-4 text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400 mx-auto"></div>
@@ -367,7 +381,7 @@ export default function StatusPage() {
                     <button
                       key={user.id}
                       onClick={() => handleUserSelect(user.id)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'} transition`}
+                      className={`w-full flex items-center gap-3 px-4 py-3 ${theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-white/10'} transition`}
                     >
                       <Image
                         src={user.avatar}
@@ -377,7 +391,7 @@ export default function StatusPage() {
                         className="w-10 h-10 rounded-full object-cover"
                       />
                       <div className="flex-1 text-left">
-                        <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>{user.name}</p>
+                        <p className={`font-semibold ${theme === 'light' ? 'text-black' : 'text-white'}`}>{user.name}</p>
                         <p className="text-sm text-gray-400">@{user.username || 'user'}</p>
                       </div>
                     </button>
@@ -403,7 +417,7 @@ export default function StatusPage() {
                 <div
                   key={status.id}
                   onClick={() => handleStatusClick(status.id)}
-                  className={`break-inside-avoid mb-3 ${theme === 'dark' ? 'bg-black/40' : 'bg-white/40'} backdrop-blur-md rounded-2xl overflow-hidden relative cursor-pointer hover:scale-[1.02] transition`}
+                  className={`break-inside-avoid mb-3 ${theme === 'light' ? 'bg-white/40' : 'bg-white/10 border border-white/30'} backdrop-blur-md rounded-2xl overflow-hidden relative cursor-pointer hover:scale-[1.02] transition`}
                 >
                   {/* Images */}
                   <div className="relative">
@@ -520,7 +534,7 @@ export default function StatusPage() {
 
           {statuses.length === 0 && (
             <div className="text-center py-12">
-              <p className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>No statuses yet</p>
+              <p className={`${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>No statuses yet</p>
             </div>
           )}
         </div>

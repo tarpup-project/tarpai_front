@@ -367,27 +367,45 @@ export default function ChannelPage() {
 
   return (
     <div 
-      className="min-h-screen text-white relative"
-      style={{
-        background: background 
-          ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${background})`
-          : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        backgroundAttachment: 'fixed',
-      }}
+      className={`min-h-screen relative ${
+        theme === 'dark' ? 'text-white' : 'text-black'
+      }`}
+      style={
+        theme === 'dark'
+          ? {
+              background: '#000000',
+            }
+          : theme === 'light'
+          ? {
+              background: '#e6e6e6',
+            }
+          : {
+              background: background 
+                ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${background})`
+                : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundAttachment: 'fixed',
+            }
+      }
     >
       {/* Overlay */}
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div>
+      {theme === 'background' && (
+        <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div>
+      )}
 
       {/* Content */}
       <div className="relative z-10 min-h-screen flex flex-col pb-20">
         {/* Header */}
-        <div className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border-b ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} p-4 flex items-center gap-3`}>
+        <div className={`backdrop-blur-md border-b p-4 flex items-center gap-3 ${
+          theme === 'light' 
+            ? 'bg-white border-gray-300' 
+            : 'bg-white/10 border-white/10'
+        }`}>
           <button
             onClick={handleBackNavigation}
-            className="text-gray-300 hover:text-white"
+            className={theme === 'light' ? 'text-gray-700 hover:text-black' : 'text-gray-300 hover:text-white'}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -403,8 +421,8 @@ export default function ChannelPage() {
           />
 
           <div className="flex-1">
-            <h2 className="font-semibold">{channel.title}</h2>
-            <p className="text-xs text-gray-400">{channel.subscribersCount} subscribers</p>
+            <h2 className={`font-semibold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>{channel.title}</h2>
+            <p className={`text-xs ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>{channel.subscribersCount} subscribers</p>
           </div>
 
           {/* Three-dot menu for owner OR Subscribe bell for non-owner */}
@@ -425,7 +443,7 @@ export default function ChannelPage() {
               }}
               className="p-2 rounded-full hover:bg-white/10 transition"
             >
-              <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-6 h-6 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`} fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
               </svg>
             </button>
@@ -434,8 +452,12 @@ export default function ChannelPage() {
               onClick={handleSubscription}
               className={`p-2 rounded-full transition ${
                 channel.isSubscribed 
-                  ? 'bg-white/20 text-white hover:bg-white/30' 
-                  : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/10'
+                  ? theme === 'light'
+                    ? 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+                    : 'bg-white/20 text-white hover:bg-white/30'
+                  : theme === 'light'
+                    ? 'bg-transparent text-gray-700 hover:text-gray-900 hover:bg-gray-100'
+                    : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/10'
               }`}
             >
               <svg className="w-6 h-6" fill={channel.isSubscribed ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
@@ -446,8 +468,12 @@ export default function ChannelPage() {
         </div>
 
         {/* Channel Info */}
-        <div className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border-b ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} p-4`}>
-          <p className="text-gray-300">{channel.subtitle}</p>
+        <div className={`backdrop-blur-md border-b p-4 ${
+          theme === 'light' 
+            ? 'bg-white border-gray-300' 
+            : 'bg-white/10 border-white/10'
+        }`}>
+          <p className={`font-medium ${theme === 'light' ? 'text-gray-700' : 'text-gray-300'}`}>{channel.subtitle}</p>
         </div>
 
         {/* Posts */}
@@ -464,7 +490,11 @@ export default function ChannelPage() {
               return (
                 <div
                   key={post.id}
-                  className={`${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/10' : 'border-white/20'} rounded-2xl p-4`}
+                  className={`backdrop-blur-md border rounded-2xl p-4 ${
+                    theme === 'light' 
+                      ? 'bg-white border-gray-300' 
+                      : 'bg-white/10 border-white/30'
+                  }`}
                 >
                   <div className="flex items-start gap-3 mb-3">
                     <Image
@@ -476,8 +506,8 @@ export default function ChannelPage() {
                     />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold">{post.author.name}</h3>
-                        <span className="text-xs text-gray-400">
+                        <h3 className={`font-semibold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>{post.author.name}</h3>
+                        <span className={`text-xs ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
                           {new Date(post.createdAt).toLocaleDateString()}
                         </span>
                       </div>
@@ -494,7 +524,7 @@ export default function ChannelPage() {
                     )}
                   </div>
                   
-                  <p className="text-white mb-3">{post.content}</p>
+                  <p className={`mb-3 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>{post.content}</p>
                   
                   <div className="flex items-center gap-4">
                     <button
@@ -518,12 +548,16 @@ export default function ChannelPage() {
           <div className="p-4">
             <button
               onClick={() => setShowCreatePostModal(true)}
-              className={`w-full ${theme === 'dark' ? 'bg-black/40' : 'bg-white/10'} backdrop-blur-md border ${theme === 'dark' ? 'border-white/20' : 'border-white/20'} rounded-2xl p-4 flex items-center justify-center gap-3 ${theme === 'dark' ? 'hover:bg-black/60' : 'hover:bg-white/20'} transition`}
+              className={`w-full backdrop-blur-md border rounded-xl p-2 flex items-center justify-center gap-3 transition ${
+                theme === 'light' 
+                  ? 'bg-pink-500 hover:bg-pink-600 border-pink-500' 
+                  : 'bg-white/10 border-white/20 hover:bg-black/60'
+              }`}
             >
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              <span className="text-white font-medium">Post Update</span>
+              <span className="text-white text-[12px] font-medium">Post Update</span>
             </button>
           </div>
         )}
@@ -533,15 +567,15 @@ export default function ChannelPage() {
       {showCreatePostModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowCreatePostModal(false)}>
           <div 
-            className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up`}
+            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between mb-4">
-                <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>Create Post</h2>
+                <h2 className="text-xl font-bold text-black">Create Post</h2>
                 <button
                   onClick={() => setShowCreatePostModal(false)}
-                  className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-900'}`}
+                  className="text-gray-400 hover:text-gray-600"
                 >
                   ✕
                 </button>
@@ -553,15 +587,15 @@ export default function ChannelPage() {
                 value={newPostContent}
                 onChange={(e) => setNewPostContent(e.target.value)}
                 placeholder="What's on your mind?"
-                className={`w-full h-32 px-4 py-3 border ${theme === 'dark' ? 'border-gray-700 bg-gray-800 text-white placeholder-gray-400' : 'border-gray-300 bg-white text-black placeholder-gray-500'} rounded-lg focus:outline-none focus:ring-2 ${theme === 'dark' ? 'focus:ring-white' : 'focus:ring-black'} resize-none`}
+                className="w-full h-32 px-3 py-2 border border-gray-200 bg-gray-100 text-black text-sm placeholder-gray-400 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-300 resize-none"
               />
             </div>
 
-            <div className={`p-6 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div className="p-6 border-t border-gray-200">
               <button
                 onClick={handleCreatePost}
                 disabled={creatingPost || !newPostContent.trim()}
-                className={`w-full ${theme === 'dark' ? 'bg-white text-black hover:bg-gray-200' : 'bg-black text-white hover:bg-gray-800'} py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed`}
+                className="w-full bg-black text-white py-3 rounded-2xl text-sm font-semibold hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {creatingPost ? 'Posting...' : 'Post Update'}
               </button>
@@ -574,7 +608,7 @@ export default function ChannelPage() {
       {showEditChannelModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowEditChannelModal(false)}>
           <div 
-            className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-white'} rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up`}
+            className={`bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
