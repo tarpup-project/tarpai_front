@@ -98,22 +98,26 @@ export default function ProfilePage() {
       console.log('User detail response:', userDetailResponse.data);
       setProfileUser(userDetailResponse.data);
 
-      // Check if the profile user is following the current user (only if logged in)
+      // Check if current user is following the profile user (only if logged in)
       if (currentUser) {
-        console.log('Fetching followers list...');
-        const followersResponse = await api.get('/follows/followers');
-        console.log('Followers response:', followersResponse.data);
-        
-        // Get the actual user ID from the detailed response
-        const targetUserId = userDetailResponse.data._id || userDetailResponse.data.id;
-        console.log('Target user ID:', targetUserId);
-        
-        const followerIds = followersResponse.data.followers?.map((f: any) => f._id || f.id) || [];
-        console.log('Follower IDs:', followerIds);
-        
-        const isCurrentlyFollowing = followerIds.includes(targetUserId);
-        console.log('Is this user following me (should show unfollow):', isCurrentlyFollowing);
-        setIsFollowing(isCurrentlyFollowing);
+        console.log('Fetching following list...');
+        try {
+          const followingResponse = await api.get('/follows/following');
+          console.log('Following response:', followingResponse.data);
+          
+          // Get the actual user ID from the detailed response
+          const targetUserId = userDetailResponse.data._id || userDetailResponse.data.id;
+          console.log('Target user ID:', targetUserId);
+          
+          const followingIds = followingResponse.data.following?.map((f: any) => f._id || f.id) || [];
+          console.log('Following IDs:', followingIds);
+          
+          const isCurrentlyFollowing = followingIds.includes(targetUserId);
+          console.log('Am I following this user:', isCurrentlyFollowing);
+          setIsFollowing(isCurrentlyFollowing);
+        } catch (error) {
+          console.log('Could not fetch follow status');
+        }
       }
 
       // Fetch user's links
