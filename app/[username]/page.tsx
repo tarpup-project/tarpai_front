@@ -9,6 +9,7 @@ import { getLinkIcon, getLinkIconBgColor } from '@/utils/linkIcons';
 import Image from 'next/image';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+import AvatarPreview from '@/components/AvatarPreview';
 
 interface Link {
   _id: string;
@@ -49,27 +50,15 @@ export default function UsernamePage() {
   const [following, setFollowing] = useState<any[]>([]);
   const [followersLoading, setFollowersLoading] = useState(false);
   const [followingLoading, setFollowingLoading] = useState(false);
+  const [showAvatarPreview, setShowAvatarPreview] = useState(false);
+  const [showSignupModal, setShowSignupModal] = useState(false);
+  const [signupName, setSignupName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
 
   useEffect(() => {
-    // Wait a bit for auth store to rehydrate from localStorage
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    if (!currentUser) {
-      // Auth store is still rehydrating, wait a bit
-      const timer = setTimeout(() => {
-        if (!currentUser) {
-          router.push('/login');
-        }
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-
+    // Allow unauthenticated access - just fetch the profile
     fetchProfile();
-  }, [username, currentUser, router]);
+  }, [username]);
 
   const fetchProfile = async () => {
     try {
@@ -109,21 +98,23 @@ export default function UsernamePage() {
       console.log('User detail response:', userDetailResponse.data);
       setProfileUser(userDetailResponse.data);
 
-      // Check if the profile user is following the current user (is in current user's followers)
-      console.log('Fetching followers list...');
-      const followersResponse = await api.get('/follows/followers');
-      console.log('Followers response:', followersResponse.data);
-      
-      // Get the actual user ID from the detailed response
-      const targetUserId = userDetailResponse.data._id || userDetailResponse.data.id;
-      console.log('Target user ID:', targetUserId);
-      
-      const followerIds = followersResponse.data.followers?.map((f: any) => f._id || f.id) || [];
-      console.log('Follower IDs:', followerIds);
-      
-      const isCurrentlyFollowing = followerIds.includes(targetUserId);
-      console.log('Is this user following me (should show unfollow):', isCurrentlyFollowing);
-      setIsFollowing(isCurrentlyFollowing);
+      // Check if the profile user is following the current user (only if logged in)
+      if (currentUser) {
+        console.log('Fetching followers list...');
+        const followersResponse = await api.get('/follows/followers');
+        console.log('Followers response:', followersResponse.data);
+        
+        // Get the actual user ID from the detailed response
+        const targetUserId = userDetailResponse.data._id || userDetailResponse.data.id;
+        console.log('Target user ID:', targetUserId);
+        
+        const followerIds = followersResponse.data.followers?.map((f: any) => f._id || f.id) || [];
+        console.log('Follower IDs:', followerIds);
+        
+        const isCurrentlyFollowing = followerIds.includes(targetUserId);
+        console.log('Is this user following me (should show unfollow):', isCurrentlyFollowing);
+        setIsFollowing(isCurrentlyFollowing);
+      }
 
       // Fetch user's links
       try {
@@ -233,13 +224,40 @@ export default function UsernamePage() {
   };
 
   const handleShowFollowers = () => {
+    if (!currentUser) {
+      setShowSignupModal(true);
+      return;
+    }
     setShowFollowersModal(true);
     fetchFollowers();
   };
 
   const handleShowFollowing = () => {
+    if (!currentUser) {
+      setShowSignupModal(true);
+      return;
+    }
     setShowFollowingModal(true);
     fetchFollowing();
+  };
+
+  const handleSignupSubmit = () => {
+    if (!signupName.trim() || !signupEmail.trim()) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(signupEmail)) {
+      toast.error('Please enter a valid email');
+      return;
+    }
+    
+    // Store the data and redirect to signup
+    localStorage.setItem('signupName', signupName);
+    localStorage.setItem('signupEmail', signupEmail);
+    router.push('/signup');
   };
 
   if (loading) {
@@ -319,9 +337,12 @@ export default function UsernamePage() {
         <div className="flex-1 flex flex-col items-center justify-start px-6 pb-32 pt-4">
           {/* Avatar */}
           <div className="relative mb-4">
-            <div className={`w-28 h-28 rounded-full border-4 overflow-hidden bg-gray-800 ${
-              theme === 'light' ? 'border-white' : 'border-white/20'
-            }`}>
+            <div 
+              onClick={() => setShowAvatarPreview(true)}
+              className={`w-28 h-28 rounded-full border-4 overflow-hidden bg-gray-800 cursor-pointer hover:opacity-90 transition ${
+                theme === 'light' ? 'border-white' : 'border-white/20'
+              }`}
+            >
               <Image
                 src={profileUser.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
                 alt={profileUser.displayName || profileUser.name}
@@ -349,66 +370,69 @@ export default function UsernamePage() {
             )}
           </div>
 
-          {/* Bio */}
-          <p className={`text-center text-sm max-w-md mb-6 px-4 ${theme === 'light' ? 'text-gray-700' : 'text-white/90'}`}>
-            {profileUser.bio || 'No bio yet.'}
-          </p>
-
           {/* Follow Button and Stats */}
           <div className="flex items-center gap-6 mb-8">
-            <button
-              onClick={handleFollowToggle}
-              disabled={followLoading}
-              className={`px-8 py-2 rounded-full font-semibold transition disabled:opacity-50 flex items-center gap-2 ${
-                isFollowing
-                  ? theme === 'light'
-                    ? 'bg-gray-300 text-black hover:bg-gray-400 shadow-md'
-                    : 'bg-white/20 text-white hover:bg-white/30'
-                  : 'bg-white text-black hover:bg-gray-200'
-              }`}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              {followLoading ? 'Loading...' : (isFollowing ? 'Unfollow' : 'Follow')}
-            </button>
+            {currentUser && (
+              <button
+                onClick={handleFollowToggle}
+                disabled={followLoading}
+                className={`px-4 py-2.5 rounded-full font-semibold transition disabled:opacity-50 flex items-center gap-2 text-sm ${
+                  isFollowing
+                    ? theme === 'light'
+                      ? 'bg-gray-300 text-black hover:bg-gray-400 shadow-md'
+                      : 'bg-white/20 text-white hover:bg-white/30'
+                    : 'bg-white text-black hover:bg-gray-200'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                {followLoading ? 'Loading...' : (isFollowing ? 'Unfollow' : 'Follow')}
+              </button>
+            )}
 
             <button
               onClick={handleShowFollowers}
               className="text-center hover:opacity-80 transition cursor-pointer"
             >
-              <div className={`text-xl font-bold ${theme === 'light' ? 'text-black' : 'text-white'}`}>{profileUser.followers?.length || 0}</div>
-              <div className={`text-xs uppercase tracking-wide ${theme === 'light' ? 'text-gray-600' : 'text-gray-300'}`}>Followers</div>
+              <div className={`text-[15px] font-bold ${theme === 'light' ? 'text-black' : 'text-white'}`}>{profileUser.followers?.length || 0}</div>
+              <div className={`text-[11px] uppercase tracking-wide font-medium ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>FOLLOWERS</div>
             </button>
 
             <button
               onClick={handleShowFollowing}
               className="text-center hover:opacity-80 transition cursor-pointer"
             >
-              <div className={`text-xl font-bold ${theme === 'light' ? 'text-black' : 'text-white'}`}>{profileUser.following?.length || 0}</div>
-              <div className={`text-xs uppercase tracking-wide ${theme === 'light' ? 'text-gray-600' : 'text-gray-300'}`}>Following</div>
+              <div className={`text-[15px] font-bold ${theme === 'light' ? 'text-black' : 'text-white'}`}>{profileUser.following?.length || 0}</div>
+              <div className={`text-[11px] uppercase tracking-wide font-medium ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>FOLLOWING</div>
             </button>
           </div>
+          {/* Bio */}
+          <p className={`text-center text-sm max-w-md mb-6 px-4 ${theme === 'light' ? 'text-gray-700' : 'text-white/90'}`}>
+            {profileUser.bio || 'No bio yet.'}
+          </p>
 
           {/* TarpUp Button */}
-          <button 
-            onClick={() => {
-              const targetUserId = profileUser._id || profileUser.id;
-              router.push(`/chat/${targetUserId}`);
-            }}
-            className={`w-full max-w-md backdrop-blur-md border rounded-2xl py-3 px-6 flex items-center justify-center gap-2 transition mb-3 ${
-              theme === 'light' 
-                ? 'bg-pink-500 hover:bg-pink-600 border-pink-500 text-white' 
-                : 'bg-white/30 border-white/20 hover:bg-white/50 text-white'
-            }`}
-          >
-            <span className="text-[12px]">
-              Click to TarpUp <span className="font-bold">{profileUser.displayName || profileUser.name}</span>
-            </span>
-            <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
-            </svg>
-          </button>
+          {currentUser && (
+            <button 
+              onClick={() => {
+                const targetUserId = profileUser._id || profileUser.id;
+                router.push(`/chat/${targetUserId}`);
+              }}
+              className={` max-w-md backdrop-blur-md border-2 rounded-2xl py-2.5 px-10 flex items-center justify-center gap-2 transition mb-3 ${
+                theme === 'light' 
+                  ? 'bg-pink-500 hover:bg-pink-600 border-pink-500 text-white' 
+                  : 'bg-white/30 border-white/20 hover:bg-white/50 text-white'
+              }`}
+            >
+              <span className="text-base font-light">
+                Click to TarpUp <span className="font-bold">{profileUser.displayName || profileUser.name}</span>
+              </span>
+              <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+              </svg>
+            </button>
+          )}
 
           {/* Handles Divider */}
           <div className="w-full max-w-md mb-3 relative flex items-center justify-center">
@@ -607,6 +631,78 @@ export default function UsernamePage() {
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Avatar Preview Modal */}
+      <AvatarPreview
+        isOpen={showAvatarPreview}
+        onClose={() => setShowAvatarPreview(false)}
+        avatarUrl={profileUser.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
+        altText={profileUser.displayName || profileUser.name}
+      />
+
+      {/* Signup Modal */}
+      {showSignupModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center px-6" onClick={() => setShowSignupModal(false)}>
+          <div className="bg-white rounded-2xl p-8 w-full max-w-md relative" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowSignupModal(false)}
+              className="absolute top-6 right-6 text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+
+            <h2 className="text-2xl font-bold mb-2 text-black">Join TarpUp</h2>
+            <p className="text-gray-600 mb-6">Create an account to follow users and see their content</p>
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="signupName" className="block text-sm font-medium text-gray-700 mb-2">
+                  Name
+                </label>
+                <input
+                  id="signupName"
+                  type="text"
+                  value={signupName}
+                  onChange={(e) => setSignupName(e.target.value)}
+                  className="w-full bg-gray-100 border border-gray-300 text-black rounded-lg px-4 py-3 focus:outline-none focus:border-gray-400"
+                  placeholder="Enter your name"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="signupEmail" className="block text-sm font-medium text-gray-700 mb-2">
+                  Email
+                </label>
+                <input
+                  id="signupEmail"
+                  type="email"
+                  value={signupEmail}
+                  onChange={(e) => setSignupEmail(e.target.value)}
+                  className="w-full bg-gray-100 border border-gray-300 text-black rounded-lg px-4 py-3 focus:outline-none focus:border-gray-400"
+                  placeholder="Enter your email"
+                />
+              </div>
+
+              <button
+                onClick={handleSignupSubmit}
+                className="w-full bg-pink-500 text-white hover:bg-pink-600 py-3 rounded-full font-semibold transition"
+              >
+                Continue
+              </button>
+
+              <p className="text-center text-sm text-gray-600">
+                Already have an account?{' '}
+                <button
+                  onClick={() => router.push('/login')}
+                  className="text-pink-500 hover:text-pink-600 font-semibold"
+                >
+                  Log in
+                </button>
+              </p>
             </div>
           </div>
         </div>

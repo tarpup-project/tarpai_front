@@ -13,6 +13,7 @@ import toast from 'react-hot-toast';
 import AppHeader from '@/components/AppHeader';
 import BottomNav from '@/components/BottomNav';
 import ImageCropper from '@/components/ImageCropper';
+import AvatarPreview from '@/components/AvatarPreview';
 
 interface Link {
   _id: string;
@@ -61,6 +62,7 @@ export default function DashboardPage() {
   const [editingLink, setEditingLink] = useState<Link | null>(null);
   const [editLinkForm, setEditLinkForm] = useState({ title: '', url: '' });
   const [editingLinkLoading, setEditingLinkLoading] = useState(false);
+  const [showAvatarPreview, setShowAvatarPreview] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -523,9 +525,12 @@ export default function DashboardPage() {
         <div className="flex-1 flex flex-col items-center justify-start px-6 pb-32 pt-4">
           {/* Avatar with Camera Button */}
           <div className="relative mb-4">
-            <div className={`w-28 h-28 rounded-full border-4 overflow-hidden bg-gray-800 ${
-              theme === 'light' ? 'border-white' : 'border-white/20'
-            }`}>
+            <div 
+              onClick={() => setShowAvatarPreview(true)}
+              className={`w-28 h-28 rounded-full border-4 overflow-hidden bg-gray-800 cursor-pointer hover:opacity-90 transition ${
+                theme === 'light' ? 'border-white' : 'border-white/20'
+              }`}
+            >
               <Image
                 src={user.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
                 alt={user.displayName || user.name}
@@ -577,7 +582,7 @@ export default function DashboardPage() {
           </p>
 
           {/* Followers/Following */}
-          <div className={`flex gap-6 mb-8 backdrop-blur-md rounded-2xl py-3 px-6 ${
+          <div className={`flex gap-6 mb-8 backdrop-blur-md rounded-2xl py-2 px-6 ${
             theme === 'light' 
               ? 'bg-gray-200 border-2 border-gray-300' 
               : 'bg-white/30 border border-white/40'
@@ -586,7 +591,7 @@ export default function DashboardPage() {
               onClick={() => setShowFollowersModal(true)}
               className="text-center hover:opacity-80 transition flex-1"
             >
-              <div className={`text-2xl font-bold ${theme === 'light' ? 'text-black' : 'text-white'}`}>{followersCount.toLocaleString()}</div>
+              <div className={`text-xl font-bold ${theme === 'light' ? 'text-black' : 'text-white'}`}>{followersCount.toLocaleString()}</div>
               <div className={`${theme === 'light' ? 'text-gray-500' : 'text-gray-300'} text-xs uppercase tracking-wide font-medium`}>Followers</div>
             </button>
             <div className={`w-px ${theme === 'light' ? 'bg-gray-300' : 'bg-white/20'}`}></div>
@@ -600,7 +605,7 @@ export default function DashboardPage() {
               }}
               className="text-center hover:opacity-80 transition flex-1"
             >
-              <div className={`text-2xl font-bold ${theme === 'light' ? 'text-black' : 'text-white'}`}>{followingCount.toLocaleString()}</div>
+              <div className={`text-xl font-bold ${theme === 'light' ? 'text-black' : 'text-white'}`}>{followingCount.toLocaleString()}</div>
               <div className={`${theme === 'light' ? 'text-gray-500' : 'text-gray-300'} text-xs uppercase tracking-wide font-medium`}>Following</div>
             </button>
           </div>
@@ -1429,6 +1434,14 @@ export default function DashboardPage() {
           </div>
         </>
       )}
+
+      {/* Avatar Preview Modal */}
+      <AvatarPreview
+        isOpen={showAvatarPreview}
+        onClose={() => setShowAvatarPreview(false)}
+        avatarUrl={user.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
+        altText={user.displayName || user.name}
+      />
     </div>
   );
 }
