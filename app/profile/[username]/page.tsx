@@ -7,6 +7,7 @@ import { useBackground } from '@/hooks/useBackground';
 import { useTheme } from '@/hooks/useTheme';
 import { getLinkIcon, getLinkIconBgColor } from '@/utils/linkIcons';
 import Image from 'next/image';
+import publicApi from '@/lib/publicApi';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import AvatarPreview from '@/components/AvatarPreview';
@@ -52,8 +53,16 @@ export default function ProfilePage() {
   const [followingLoading, setFollowingLoading] = useState(false);
   const [showAvatarPreview, setShowAvatarPreview] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [signupName, setSignupName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
+  const [pendingAction, setPendingAction] = useState<'follow' | 'followers' | 'following' | 'tarpup' | null>(null);
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+
+  // Debug: Log showLoginModal state changes
+  useEffect(() => {
+    console.log('showLoginModal state changed:', showLoginModal);
+  }, [showLoginModal]);
 
   useEffect(() => {
     // Allow unauthenticated access - just fetch the profile
@@ -141,7 +150,23 @@ export default function ProfilePage() {
   };
 
   const handleFollowToggle = async () => {
-    if (!profileUser) return;
+    console.log('=== handleFollowToggle called ===');
+    console.log('profileUser:', profileUser);
+    console.log('currentUser:', currentUser);
+    
+    if (!profileUser) {
+      console.log('No profileUser, returning early');
+      return;
+    }
+
+    // Check if user is logged in first
+    if (!currentUser) {
+      console.log('No currentUser - showing login modal');
+      setPendingAction('follow');
+      setShowLoginModal(true);
+      console.log('showLoginModal state set to true');
+      return;
+    }
 
     const targetUserId = profileUser._id || profileUser.id;
     console.log('Toggling follow for user ID:', targetUserId);
@@ -174,7 +199,16 @@ export default function ProfilePage() {
       }
     } catch (error: any) {
       console.error('Follow toggle error:', error);
-      toast.error(error.response?.data?.message || 'Failed to update follow status');
+      console.log('Error status:', error.response?.status);
+      
+      // Show login modal on 401 error instead of redirecting
+      if (error.response?.status === 401) {
+        console.log('401 error - showing login modal');
+        setShowLoginModal(true);
+        console.log('showLoginModal state set to true after 401');
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to update follow status');
+      }
     } finally {
       setFollowLoading(false);
     }
@@ -198,7 +232,7 @@ export default function ProfilePage() {
   };
 
   const fetchFollowers = async () => {
-    if (!profileUser) return;
+    if (!profileUser || !currentUser) return;
     setFollowersLoading(true);
     try {
       const targetUserId = profileUser._id || profileUser.id;
@@ -213,7 +247,7 @@ export default function ProfilePage() {
   };
 
   const fetchFollowing = async () => {
-    if (!profileUser) return;
+    if (!profileUser || !currentUser) return;
     setFollowingLoading(true);
     try {
       const targetUserId = profileUser._id || profileUser.id;
@@ -228,24 +262,38 @@ export default function ProfilePage() {
   };
 
   const handleShowFollowers = () => {
+    console.log('=== handleShowFollowers called ===');
+    console.log('currentUser:', currentUser);
+    
     if (!currentUser) {
-      setShowSignupModal(true);
+      console.log('No currentUser - showing login modal for followers');
+      setPendingAction('followers');
+      setShowLoginModal(true);
       return;
     }
+    
+    console.log('User is authenticated, showing followers modal');
     setShowFollowersModal(true);
     fetchFollowers();
   };
 
   const handleShowFollowing = () => {
+    console.log('=== handleShowFollowing called ===');
+    console.log('currentUser:', currentUser);
+    
     if (!currentUser) {
-      setShowSignupModal(true);
+      console.log('No currentUser - showing login modal for following');
+      setPendingAction('following');
+      setShowLoginModal(true);
       return;
     }
+    
+    console.log('User is authenticated, showing following modal');
     setShowFollowingModal(true);
     fetchFollowing();
   };
 
-  const handleSignupSubmit = () => {
+  const handleSignupSubmit = async () => {
     if (!signupName.trim() || !signupEmail.trim()) {
       toast.error('Please fill in all fields');
       return;
@@ -258,10 +306,85 @@ export default function ProfilePage() {
       return;
     }
     
-    // Store the data and redirect to signup
-    localStorage.setItem('signupName', signupName);
-    localStorage.setItem('signupEmail', signupEmail);
-    router.push('/signup');
+    setIsCreatingAccount(true);
+    
+    try {
+      // Map pendingAction to source string
+      const sourceMap = {
+        follow: 'profile_follow',
+        followers: 'profile_followers',
+        following: 'profile_following',
+        tarpup: 'profile_tarpup',
+      };
+      
+      // Create account silently
+      const signupResponse = await publicApi.post('/auth/silent-signup', {
+        name: signupName,
+        email: signupEmail,
+        password: Math.random().toString(36).slice(-8), // Generate random password
+        source: pendingAction ? sourceMap[pendingAction] : undefined,
+        referrerId: profileUser?._id || profileUser?.id,
+      });
+      
+      console.log('Account created:', signupResponse.data);
+      
+      // Store token and user data
+      const { token, user } = signupResponse.data;
+      localStorage.setItem('token', token);
+      useAuthStore.getState().setAuth(user, token);
+      
+      // Close modal
+      setShowLoginModal(false);
+      
+      // Execute the pending action
+      if (pendingAction === 'follow' && profileUser) {
+        // Trigger follow action directly with the new user
+        const targetUserId = profileUser._id || profileUser.id;
+        try {
+          await api.post(`/follows/${targetUserId}`);
+          setIsFollowing(true);
+          setProfileUser({
+            ...profileUser,
+            followers: [...profileUser.followers, user.id],
+            followersCount: (profileUser.followersCount || 0) + 1,
+          });
+        } catch (error) {
+          console.error('Failed to follow:', error);
+        }
+      } else if (pendingAction === 'followers') {
+        setShowFollowersModal(true);
+        fetchFollowers();
+      } else if (pendingAction === 'following') {
+        setShowFollowingModal(true);
+        fetchFollowing();
+      } else if (pendingAction === 'tarpup' && profileUser) {
+        // For TarpUp, automatically follow the user first to enable chat
+        const targetUserId = profileUser._id || profileUser.id;
+        try {
+          await api.post(`/follows/${targetUserId}`);
+          setIsFollowing(true);
+          setProfileUser({
+            ...profileUser,
+            followers: [...profileUser.followers, user.id],
+            followersCount: (profileUser.followersCount || 0) + 1,
+          });
+        } catch (error) {
+          console.error('Failed to follow:', error);
+        }
+        // Navigate to chat
+        router.push(`/chat/${targetUserId}`);
+      }
+      
+      // Reset
+      setPendingAction(null);
+      setSignupName('');
+      setSignupEmail('');
+    } catch (error: any) {
+      console.error('Failed to create account:', error);
+      toast.error(error.response?.data?.message || 'Failed to create account');
+    } finally {
+      setIsCreatingAccount(false);
+    }
   };
 
   if (loading) {
@@ -376,24 +499,22 @@ export default function ProfilePage() {
          
           {/* Follow Button and Stats */}
           <div className="flex items-center gap-6 mb-8">
-            {currentUser && (
-              <button
-                onClick={handleFollowToggle}
-                disabled={followLoading}
-                className={`px-4 py-2.5 rounded-full font-semibold transition disabled:opacity-50 flex items-center gap-2 text-sm ${
-                  isFollowing
-                    ? theme === 'light'
-                      ? 'bg-gray-300 text-black hover:bg-gray-400 shadow-md'
-                      : 'bg-white/20 text-white hover:bg-white/30'
-                    : 'bg-white text-black hover:bg-gray-200'
-                }`}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                {followLoading ? 'Loading...' : (isFollowing ? 'Unfollow' : 'Follow')}
-              </button>
-            )}
+            <button
+              onClick={handleFollowToggle}
+              disabled={followLoading}
+              className={`px-4 py-2.5 rounded-full font-semibold transition disabled:opacity-50 flex items-center gap-2 text-sm ${
+                isFollowing
+                  ? theme === 'light'
+                    ? 'bg-gray-300 text-black hover:bg-gray-400 shadow-md'
+                    : 'bg-white/20 text-white hover:bg-white/30'
+                  : 'bg-white text-black hover:bg-gray-200'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              {followLoading ? 'Loading...' : (isFollowing ? 'Unfollow' : 'Follow')}
+            </button>
 
             <button
               onClick={handleShowFollowers}
@@ -417,26 +538,29 @@ export default function ProfilePage() {
           </p>
 
           {/* TarpUp Button */}
-          {currentUser && (
-            <button 
-              onClick={() => {
-                const targetUserId = profileUser._id || profileUser.id;
-                router.push(`/chat/${targetUserId}`);
-              }}
-              className={` max-w-md backdrop-blur-md border-2 rounded-2xl py-2.5 px-10 flex items-center justify-center gap-2 transition mb-3 ${
-                theme === 'light' 
-                  ? 'bg-pink-500 hover:bg-pink-600 border-pink-500 text-white' 
-                  : 'bg-white/30 border-white/20 hover:bg-white/50 text-white'
-              }`}
-            >
-              <span className="text-base font-light">
-                Click to TarpUp <span className="font-bold">{profileUser.displayName || profileUser.name}</span>
-              </span>
-              <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
-              </svg>
-            </button>
-          )}
+          <button 
+            onClick={() => {
+              if (!currentUser) {
+                setPendingAction('tarpup');
+                setShowLoginModal(true);
+                return;
+              }
+              const targetUserId = profileUser._id || profileUser.id;
+              router.push(`/chat/${targetUserId}`);
+            }}
+            className={` max-w-md backdrop-blur-md border-2 rounded-2xl py-2.5 px-10 flex items-center justify-center gap-2 transition mb-3 ${
+              theme === 'light' 
+                ? 'bg-pink-500 hover:bg-pink-600 border-pink-500 text-white' 
+                : 'bg-white/30 border-white/20 hover:bg-white/50 text-white'
+            }`}
+          >
+            <span className="text-base font-light">
+              Click to TarpUp <span className="font-bold">{profileUser.displayName || profileUser.name}</span>
+            </span>
+            <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+            </svg>
+          </button>
 
           {/* Handles Divider */}
           <div className="w-full max-w-md mb-3 relative flex items-center justify-center">
@@ -497,7 +621,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Followers Modal */}
-      {showFollowersModal && (
+      {showFollowersModal && currentUser && (
         <div className={`fixed inset-0 ${theme === 'light' ? 'bg-black/40' : 'bg-black/60'} backdrop-blur-sm z-50 flex items-end`} onClick={() => setShowFollowersModal(false)}>
           <div 
             className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
@@ -537,7 +661,7 @@ export default function ProfilePage() {
       )}
 
       {/* Following Modal */}
-      {showFollowingModal && (
+      {showFollowingModal && currentUser && (
         <div className={`fixed inset-0 ${theme === 'dark' ? 'bg-black/60' : 'bg-black/40'} backdrop-blur-sm z-50 flex items-end`} onClick={() => setShowFollowingModal(false)}>
           <div className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-200">
@@ -629,6 +753,68 @@ export default function ProfilePage() {
                 className="w-full bg-pink-500 text-white hover:bg-pink-600 py-3 rounded-full font-semibold transition"
               >
                 Continue
+              </button>
+
+              <p className="text-center text-sm text-gray-600">
+                Already have an account?{' '}
+                <button
+                  onClick={() => router.push('/login')}
+                  className="text-pink-500 hover:text-pink-600 font-semibold"
+                >
+                  Log in
+                </button>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center px-6" onClick={() => setShowLoginModal(false)}>
+          <div className="bg-white rounded-2xl p-8 w-full max-w-md relative" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowLoginModal(false)}
+              className="absolute top-6 right-6 text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="loginName" className="block text-sm font-medium text-gray-700 mb-2">
+                  Name
+                </label>
+                <input
+                  id="loginName"
+                  type="text"
+                  value={signupName}
+                  onChange={(e) => setSignupName(e.target.value)}
+                  className="w-full bg-gray-100 border border-gray-300 text-black rounded-lg px-4 py-3 focus:outline-none focus:border-gray-400"
+                  placeholder="Enter your name"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="loginEmail" className="block text-sm font-medium text-gray-700 mb-2">
+                  Email
+                </label>
+                <input
+                  id="loginEmail"
+                  type="email"
+                  value={signupEmail}
+                  onChange={(e) => setSignupEmail(e.target.value)}
+                  className="w-full bg-gray-100 border border-gray-300 text-black rounded-lg px-4 py-3 focus:outline-none focus:border-gray-400"
+                  placeholder="Enter your email"
+                />
+              </div>
+
+              <button
+                onClick={handleSignupSubmit}
+                disabled={isCreatingAccount}
+                className="w-full bg-pink-500 text-white hover:bg-pink-600 py-3 rounded-full font-semibold transition disabled:opacity-50"
+              >
+                {isCreatingAccount ? 'Creating account...' : 'Continue'}
               </button>
 
               <p className="text-center text-sm text-gray-600">
