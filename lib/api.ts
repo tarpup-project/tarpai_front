@@ -28,31 +28,18 @@ api.interceptors.response.use(
     }
     
     if (error.response?.status === 401) {
-      // Check if we're on a profile page - don't redirect, let the component handle it
-      const currentPath = window.location.pathname;
-      const isProfilePage = currentPath.startsWith('/profile/') || 
-                           (currentPath.match(/^\/[^\/]+$/) && 
-                            currentPath !== '/' && 
-                            currentPath !== '/login' && 
-                            currentPath !== '/signup' &&
-                            currentPath !== '/dashboard' &&
-                            currentPath !== '/chats' &&
-                            currentPath !== '/status' &&
-                            currentPath !== '/appearance');
+      // Check if user has a token
+      const hasToken = !!localStorage.getItem('token');
       
-      console.log('401 Interceptor - currentPath:', currentPath);
-      console.log('401 Interceptor - isProfilePage:', isProfilePage);
-      
-      // Always clear the token and user data on 401
-      localStorage.removeItem('token');
-      useAuthStore.getState().logout();
-      
-      if (!isProfilePage) {
-        console.log('401 Interceptor - Redirecting to /login');
-        window.location.href = '/login';
-      } else {
-        console.log('401 Interceptor - On profile page, not redirecting');
+      if (hasToken) {
+        // Token exists but is invalid - clear it and redirect
+        localStorage.removeItem('token');
+        useAuthStore.getState().logout();
       }
+      
+      // Always redirect to login on 401
+      // Profile pages should use publicApi instead of this api instance
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }

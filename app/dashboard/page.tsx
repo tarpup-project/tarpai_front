@@ -74,22 +74,27 @@ export default function DashboardPage() {
   const [avatarPreview, setAvatarPreview] = useState('');
   const [showAvatarCropper, setShowAvatarCropper] = useState(false);
   const [avatarToCrop, setAvatarToCrop] = useState<string | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  // Wait for Zustand to rehydrate from localStorage
+  // Check authentication immediately using localStorage
   useEffect(() => {
-    setIsHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isHydrated) return; // Wait for hydration
+    const token = localStorage.getItem('token');
     
-    if (!user) {
+    if (!token) {
       router.push('/login');
     } else {
-      // Fetch follow counts and refresh user data
+      setIsCheckingAuth(false);
+      setIsHydrated(true);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    if (!isHydrated || isCheckingAuth) return;
+    
+    if (user) {
       fetchUserData();
     }
-  }, [user, router, isHydrated]);
+  }, [user, isHydrated, isCheckingAuth]);
 
   const fetchUserData = async () => {
     try {
@@ -501,6 +506,15 @@ export default function DashboardPage() {
   if (!isHydrated || !user || loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      </div>
+    );
+  }
+
+  // Show loading while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
       </div>
     );

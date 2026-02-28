@@ -39,7 +39,7 @@ export default function StatusPage() {
   const { theme } = useTheme();
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isHydrated, setIsHydrated] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState<StatusDetail | null>(null);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showRepostModal, setShowRepostModal] = useState(false);
@@ -54,19 +54,24 @@ export default function StatusPage() {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
 
+  // Check authentication immediately using localStorage
   useEffect(() => {
-    setIsHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isHydrated) return;
+    const token = localStorage.getItem('token');
     
-    if (!user) {
+    if (!token) {
       router.push('/login');
     } else {
+      setIsCheckingAuth(false);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    if (isCheckingAuth) return;
+    
+    if (user) {
       fetchStatuses();
     }
-  }, [user, router, isHydrated]);
+  }, [user, isCheckingAuth]);
 
   const fetchStatuses = async () => {
     try {
@@ -300,9 +305,18 @@ export default function StatusPage() {
     return 'quad';
   };
 
-  if (!isHydrated || !user || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      </div>
+    );
+  }
+
+  // Show loading while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
       </div>
     );

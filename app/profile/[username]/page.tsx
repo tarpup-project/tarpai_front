@@ -8,7 +8,6 @@ import { useTheme } from '@/hooks/useTheme';
 import { getLinkIcon, getLinkIconBgColor } from '@/utils/linkIcons';
 import Image from 'next/image';
 import publicApi from '@/lib/publicApi';
-import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import AvatarPreview from '@/components/AvatarPreview';
 
@@ -85,7 +84,7 @@ export default function ProfilePage() {
       
       // Try to find user by username first
       try {
-        const usersResponse = await api.get('/users');
+        const usersResponse = await publicApi.get('/users');
         console.log('Users response count:', usersResponse.data.length);
         
         foundUser = usersResponse.data.find((u: any) => u.username === username);
@@ -103,7 +102,7 @@ export default function ProfilePage() {
 
       // Fetch full user details including followers/following
       console.log('Fetching user details for ID:', userId);
-      const userDetailResponse = await api.get(`/users/${userId}`);
+      const userDetailResponse = await publicApi.get(`/users/${userId}`);
       console.log('User detail response:', userDetailResponse.data);
       setProfileUser(userDetailResponse.data);
 
@@ -111,7 +110,7 @@ export default function ProfilePage() {
       if (currentUser) {
         console.log('Fetching following list...');
         try {
-          const followingResponse = await api.get('/follows/following');
+          const followingResponse = await publicApi.get('/follows/following');
           console.log('Following response:', followingResponse.data);
           
           // Get the actual user ID from the detailed response
@@ -132,7 +131,7 @@ export default function ProfilePage() {
       // Fetch user's links
       try {
         console.log('Fetching links for user:', userId);
-        const linksResponse = await api.get(`/users/${userId}/links`);
+        const linksResponse = await publicApi.get(`/users/${userId}/links`);
         console.log('Links response:', linksResponse.data);
         setLinks(linksResponse.data.links || []);
       } catch (error: any) {
@@ -176,7 +175,7 @@ export default function ProfilePage() {
     try {
       if (isFollowing) {
         console.log('Unfollowing...');
-        await api.delete(`/follows/${targetUserId}`);
+        await publicApi.delete(`/follows/${targetUserId}`);
         toast.success('Unfollowed successfully');
         setIsFollowing(false);
         // Update follower count
@@ -187,7 +186,7 @@ export default function ProfilePage() {
         });
       } else {
         console.log('Following...');
-        await api.post(`/follows/${targetUserId}`);
+        await publicApi.post(`/follows/${targetUserId}`);
         toast.success('Following successfully');
         setIsFollowing(true);
         // Update follower count
@@ -236,7 +235,7 @@ export default function ProfilePage() {
     setFollowersLoading(true);
     try {
       const targetUserId = profileUser._id || profileUser.id;
-      const response = await api.get(`/follows/followers/${targetUserId}`);
+      const response = await publicApi.get(`/follows/followers/${targetUserId}`);
       setFollowers(response.data.followers || []);
     } catch (error) {
       console.error('Failed to fetch followers:', error);
@@ -251,7 +250,7 @@ export default function ProfilePage() {
     setFollowingLoading(true);
     try {
       const targetUserId = profileUser._id || profileUser.id;
-      const response = await api.get(`/follows/following/${targetUserId}`);
+      const response = await publicApi.get(`/follows/following/${targetUserId}`);
       setFollowing(response.data.following || []);
     } catch (error) {
       console.error('Failed to fetch following:', error);
@@ -264,11 +263,16 @@ export default function ProfilePage() {
   const handleShowFollowers = () => {
     console.log('=== handleShowFollowers called ===');
     console.log('currentUser:', currentUser);
+    console.log('localStorage token:', localStorage.getItem('token'));
     
-    if (!currentUser) {
-      console.log('No currentUser - showing login modal for followers');
+    // Check both currentUser and localStorage token
+    const hasAuth = currentUser && localStorage.getItem('token');
+    
+    if (!hasAuth) {
+      console.log('No authentication - showing login modal for followers');
       setPendingAction('followers');
       setShowLoginModal(true);
+      console.log('showLoginModal set to:', true);
       return;
     }
     
@@ -280,11 +284,16 @@ export default function ProfilePage() {
   const handleShowFollowing = () => {
     console.log('=== handleShowFollowing called ===');
     console.log('currentUser:', currentUser);
+    console.log('localStorage token:', localStorage.getItem('token'));
     
-    if (!currentUser) {
-      console.log('No currentUser - showing login modal for following');
+    // Check both currentUser and localStorage token
+    const hasAuth = currentUser && localStorage.getItem('token');
+    
+    if (!hasAuth) {
+      console.log('No authentication - showing login modal for following');
       setPendingAction('following');
       setShowLoginModal(true);
+      console.log('showLoginModal set to:', true);
       return;
     }
     
@@ -341,7 +350,7 @@ export default function ProfilePage() {
         // Trigger follow action directly with the new user
         const targetUserId = profileUser._id || profileUser.id;
         try {
-          await api.post(`/follows/${targetUserId}`);
+          await publicApi.post(`/follows/${targetUserId}`);
           setIsFollowing(true);
           setProfileUser({
             ...profileUser,
@@ -361,7 +370,7 @@ export default function ProfilePage() {
         // For TarpUp, automatically follow the user first to enable chat
         const targetUserId = profileUser._id || profileUser.id;
         try {
-          await api.post(`/follows/${targetUserId}`);
+          await publicApi.post(`/follows/${targetUserId}`);
           setIsFollowing(true);
           setProfileUser({
             ...profileUser,
@@ -540,11 +549,22 @@ export default function ProfilePage() {
           {/* TarpUp Button */}
           <button 
             onClick={() => {
-              if (!currentUser) {
+              console.log('=== TarpUp button clicked ===');
+              console.log('currentUser:', currentUser);
+              console.log('localStorage token:', localStorage.getItem('token'));
+              
+              // Check both currentUser and localStorage token
+              const hasAuth = currentUser && localStorage.getItem('token');
+              
+              if (!hasAuth) {
+                console.log('No authentication - showing login modal for tarpup');
                 setPendingAction('tarpup');
                 setShowLoginModal(true);
+                console.log('showLoginModal set to:', true);
                 return;
               }
+              
+              console.log('User is authenticated, navigating to chat');
               const targetUserId = profileUser._id || profileUser.id;
               router.push(`/chat/${targetUserId}`);
             }}

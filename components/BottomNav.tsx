@@ -40,14 +40,21 @@ export default function BottomNav() {
         </button>
         
         <button 
-          className="flex flex-col items-center gap-1 text-gray-400 hover:text-white"
+          onClick={() => router.push('/tarpai')}
+          className={`flex flex-col items-center gap-1 group ${
+            isActive('/tarpai') ? 'text-white' : 'text-gray-400 hover:text-white'
+          }`}
         >
           <Image 
             src="/logo.png" 
             alt="TarpAI" 
             width={24} 
             height={24} 
-            className="w-6 h-6 brightness-[0.6] grayscale"
+            className={`w-6 h-6 transition ${
+              isActive('/tarpai') 
+                ? '' 
+                : 'brightness-[0.6] grayscale group-hover:brightness-100 group-hover:grayscale-0'
+            }`}
           />
           <span className="text-xs">TarpAI</span>
         </button>
