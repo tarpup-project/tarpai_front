@@ -83,7 +83,12 @@ export default function BottomNav() {
           <span className="text-xs">Status</span>
         </button>
         
-        <button className="flex flex-col items-center gap-1 text-gray-400 hover:text-white">
+        <button 
+          onClick={() => router.push('/more')}
+          className={`flex flex-col items-center gap-1 ${
+            isActive('/more') ? 'text-white' : 'text-gray-400 hover:text-white'
+          }`}
+        >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
           </svg>

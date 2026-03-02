@@ -15,6 +15,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/profile/:username',
+        destination: '/:username',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

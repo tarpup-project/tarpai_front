@@ -218,27 +218,10 @@ export default function AppHeader() {
     return date.toLocaleDateString();
   };
 
-  const handleLogout = () => {
-    // Clear auth state
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    
-    // Disconnect socket if connected
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-    }
-    
-    // Show success message
-    toast.success('Logged out successfully');
-    
-    // Redirect to login
-    router.push('/login');
-  };
-
   return (
     <>
       <div className="flex justify-between items-start p-6">
-        <button onClick={handleLogout} className="cursor-pointer">
+        <div className="cursor-pointer">
           <Image 
             src="/logo.png" 
             alt="TarpAI" 
@@ -246,7 +229,7 @@ export default function AppHeader() {
             height={32} 
             className={`w-8 h-8 ${theme === 'light' ? 'brightness-0' : ''}`}
           />
-        </button>
+        </div>
         
         <div className="flex gap-3">
           <button 

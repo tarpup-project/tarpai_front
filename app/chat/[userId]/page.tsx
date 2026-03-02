@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useBackground } from '@/hooks/useBackground';
 import { useTheme } from '@/hooks/useTheme';
 import Image from 'next/image';
+import publicApi from '@/lib/publicApi';
 import api from '@/lib/api';
 import { WS_URL } from '@/config/api.config';
 import { io, Socket } from 'socket.io-client';
@@ -71,10 +72,55 @@ export default function ChatPage() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [showChatMenu, setShowChatMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
+  const [isPublicChat, setIsPublicChat] = useState(false);
+  const [publicUserName, setPublicUserName] = useState('');
+  const [publicUserEmail, setPublicUserEmail] = useState('');
+  const [showPublicForm, setShowPublicForm] = useState(false);
+  const [publicUserMessage, setPublicUserMessage] = useState('');
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Track user activity
+  useEffect(() => {
+    const trackActivity = async () => {
+      const token = localStorage.getItem('token');
+      if (token && currentUser) {
+        try {
+          await api.post('/users/activity/update');
+        } catch (error) {
+          // Silently fail - activity tracking is not critical
+          console.log('Activity tracking failed:', error);
+        }
+      }
+    };
+
+    // Track activity immediately
+    trackActivity();
+
+    // Track activity every 5 minutes while user is active
+    const activityInterval = setInterval(trackActivity, 5 * 60 * 1000);
+
+    // Track activity on user interactions
+    const handleUserActivity = () => {
+      trackActivity();
+    };
+
+    // Add event listeners for user activity
+    window.addEventListener('click', handleUserActivity);
+    window.addEventListener('keypress', handleUserActivity);
+    window.addEventListener('scroll', handleUserActivity);
+
+    return () => {
+      clearInterval(activityInterval);
+      window.removeEventListener('click', handleUserActivity);
+      window.removeEventListener('keypress', handleUserActivity);
+      window.removeEventListener('scroll', handleUserActivity);
+    };
+  }, [currentUser]);
 
   useEffect(() => {
     // Handle browser back/forward navigation
@@ -93,28 +139,46 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
-    // Wait a bit for auth store to rehydrate from localStorage
+    // Check if user is authenticated immediately
     const token = localStorage.getItem('token');
+    
+    console.log('=== CHAT PAGE USEEFFECT ===');
+    console.log('token:', !!token);
+    console.log('currentUser:', !!currentUser);
+    console.log('userId:', userId);
+    
+    // If no token, immediately show public chat
     if (!token) {
-      router.push('/login');
+      console.log('No token - initializing public chat immediately');
+      initializePublicChat();
       return;
     }
 
-    if (!currentUser) {
-      // Auth store is still rehydrating, wait a bit
+    // If we have a token but no currentUser, wait briefly for auth store
+    if (token && !currentUser) {
+      console.log('Have token but no currentUser - waiting briefly...');
       const timer = setTimeout(() => {
-        if (!currentUser) {
-          router.push('/login');
+        const updatedUser = useAuthStore.getState().user;
+        if (updatedUser) {
+          console.log('User loaded - initializing authenticated chat');
+          initializeChat();
+        } else {
+          console.log('Token invalid - clearing and showing public chat');
+          localStorage.removeItem('token');
+          initializePublicChat();
         }
-      }, 100);
+      }, 100); // Reduced timeout
       return () => clearTimeout(timer);
     }
 
-    initializeChat();
+    // If we have both token and currentUser, initialize authenticated chat
+    if (token && currentUser) {
+      console.log('Authenticated user - initializing normal chat');
+      initializeChat();
+    }
 
     return () => {
       if (socketRef.current) {
-        // Leave the conversation before disconnecting
         const conversationId = (socketRef.current as any).conversationId;
         if (conversationId) {
           socketRef.current.emit('leave_conversation', { conversationId });
@@ -122,7 +186,68 @@ export default function ChatPage() {
         socketRef.current.disconnect();
       }
     };
-  }, [userId, currentUser, router]);
+  }, [userId, currentUser]);
+
+  const initializePublicChat = async () => {
+    try {
+      console.log('=== INITIALIZING PUBLIC CHAT ===');
+      console.log('userId param:', userId);
+      
+      // Only fetch the user we want to chat with (this is public)
+      const userResponse = await publicApi.get(`/users/${userId}`);
+      console.log('User found:', userResponse.data);
+      setChatUser(userResponse.data);
+      setIsGroupChat(false);
+      setIsPublicChat(true);
+      setShowPublicForm(true);
+      
+      // Don't try to create conversations or fetch messages for unauthenticated users
+      // This will be handled after they sign up
+    } catch (error: any) {
+      console.error('Failed to initialize public chat:', error);
+      toast.error('User not found');
+      router.push('/');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePublicChatSubmit = async () => {
+    if (!publicUserName.trim() || !publicUserEmail.trim() || !publicUserMessage.trim()) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(publicUserEmail)) {
+      toast.error('Please enter a valid email');
+      return;
+    }
+    
+    setIsCreatingAccount(true);
+    
+    try {
+      // Create pending user and send verification email
+      const response = await publicApi.post('/auth/create-pending-user', {
+        name: publicUserName,
+        email: publicUserEmail,
+        recipientId: chatUser?._id,
+        messageContent: publicUserMessage,
+      });
+      
+      console.log('Pending user created:', response.data);
+      toast.success('Verification email sent! Please check your email.');
+      
+      // Show email sent confirmation
+      setEmailSent(true);
+    } catch (error: any) {
+      console.error('Failed to create pending user:', error);
+      toast.error(error.response?.data?.message || 'Failed to send verification email');
+    } finally {
+      setIsCreatingAccount(false);
+    }
+  };
 
   const initializeChat = async () => {
     try {
@@ -135,14 +260,14 @@ export default function ChatPage() {
       // First, try to fetch as a user ID (direct message)
       try {
         console.log('Attempting to fetch as user ID...');
-        const userResponse = await api.get(`/users/${userId}`);
+        const userResponse = await publicApi.get(`/users/${userId}`);
         console.log('User found:', userResponse.data);
         setChatUser(userResponse.data);
         setIsGroupChat(false);
 
         // Create or get conversation
         console.log('Creating/getting conversation with user...');
-        const conversationResponse = await api.post('/chat/conversations', {
+        const conversationResponse = await publicApi.post('/chat/conversations', {
           participantId: userId,
         });
         console.log('Conversation response:', conversationResponse.data);
@@ -153,7 +278,7 @@ export default function ChatPage() {
         // If fetching as user fails, try as conversation ID (group chat)
         try {
           console.log('Attempting to fetch as conversation ID...');
-          const convResponse = await api.get(`/chat/conversations/${userId}`);
+          const convResponse = await publicApi.get(`/chat/conversations/${userId}`);
           console.log('Conversation found:', convResponse.data);
           conversationId = convResponse.data.id;
           
@@ -185,7 +310,7 @@ export default function ChatPage() {
 
       // Mark messages as read
       try {
-        await api.put(`/chat/conversations/${conversationId}/read`);
+        await publicApi.put(`/chat/conversations/${conversationId}/read`);
         console.log('Messages marked as read');
       } catch (error) {
         console.error('Failed to mark messages as read:', error);
@@ -279,7 +404,7 @@ export default function ChatPage() {
         const conversationId = (socketRef.current as any).conversationId;
         if (conversationId && message.sender._id !== currentUser?.id) {
           // Mark the message as read immediately
-          api.put(`/chat/conversations/${conversationId}/read`).catch(err => {
+          publicApi.put(`/chat/conversations/${conversationId}/read`).catch(err => {
             console.error('Failed to mark message as read:', err);
           });
         }
@@ -304,7 +429,7 @@ export default function ChatPage() {
 
       // Fetch conversation history
       try {
-        const messagesResponse = await api.get(`/chat/conversations/${conversationId}/messages`);
+        const messagesResponse = await publicApi.get(`/chat/conversations/${conversationId}/messages`);
         setMessages(messagesResponse.data.messages.map((msg: any) => ({
           _id: msg.id,
           sender: msg.sender._id || msg.sender,
@@ -371,7 +496,7 @@ export default function ChatPage() {
         }
 
         try {
-          await api.post(`/chat/conversations/${conversationId}/messages`, formData, {
+          await publicApi.post(`/chat/conversations/${conversationId}/messages`, formData, {
             headers: {
               'Content-Type': 'multipart/form-data',
             },
@@ -652,6 +777,204 @@ export default function ChatPage() {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      </div>
+    );
+  }
+
+  // Show public chat form for unauthenticated users
+  if (isPublicChat && showPublicForm && chatUser) {
+    return (
+      <div 
+        className={`min-h-screen flex flex-col relative ${
+          theme === 'dark' ? 'text-white' : 'text-black'
+        }`}
+        style={
+          theme === 'dark'
+            ? {
+                background: '#000000',
+              }
+            : theme === 'light'
+            ? {
+                background: '#e6e6e6',
+              }
+            : {
+                background: background 
+                  ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${background})`
+                  : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                backgroundAttachment: 'fixed',
+              }
+        }
+      >
+        {/* Overlay for better text readability */}
+        {theme === 'background' && (
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div>
+        )}
+
+        {/* Content */}
+        <div className="relative z-10 flex flex-col h-screen">
+          {/* Header */}
+          <div 
+            className={`backdrop-blur-md border-b p-4 flex items-center gap-3 ${
+              theme === 'light' 
+                ? 'border-gray-300' 
+                : 'border-white/10'
+            }`}
+            style={
+              theme === 'light'
+                ? {
+                    background: 'linear-gradient(to bottom, #4a4a4a, #2d2d2d)',
+                  }
+                : {
+                    background: 'rgba(0, 0, 0, 0.4)',
+                  }
+            }
+          >
+            <button
+              onClick={() => router.back()}
+              className="text-gray-300 hover:text-white"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+
+            <Image
+              src={chatUser.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
+              alt={chatUser.name}
+              width={40}
+              height={40}
+              className="w-10 h-10 rounded-full object-cover"
+            />
+
+            <div className="flex-1 min-w-0">
+              <h2 className={`font-semibold truncate ${theme === 'light' ? 'text-white' : 'text-white'}`}>{chatUser.displayName || chatUser.name}</h2>
+            </div>
+
+            <button 
+              onClick={() => window.location.href = '/login'}
+              className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-full text-sm font-medium transition"
+            >
+              Login
+            </button>
+          </div>
+
+          {/* Main Content */}
+          <div className="flex-1 flex flex-col justify-center px-6">
+            <div className="text-center mb-8">
+              <h1 className={`text-2xl font-bold mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+                Link up with
+              </h1>
+              <h2 className={`text-2xl font-bold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+                {chatUser.displayName || chatUser.name} using <span className="text-pink-500">AI</span>
+              </h2>
+            </div>
+          </div>
+
+          {/* Bottom Form Container */}
+          <div className="p-6 pb-8">
+            {!emailSent ? (
+              <>
+                <div className={`rounded-2xl p-6 space-y-4 mb-4 ${
+                  theme === 'light' 
+                    ? 'bg-white/90 border border-gray-300' 
+                    : 'bg-white/10 backdrop-blur-md border border-white/20'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <svg className={`w-5 h-5 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <input
+                      type="text"
+                      value={publicUserName}
+                      onChange={(e) => setPublicUserName(e.target.value)}
+                      placeholder="Enter your first name:"
+                      className={`flex-1 bg-transparent border-none outline-none text-base ${
+                        theme === 'light' ? 'text-gray-900 placeholder-gray-500' : 'text-white placeholder-gray-400'
+                      }`}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <svg className={`w-5 h-5 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                    </svg>
+                    <input
+                      type="email"
+                      value={publicUserEmail}
+                      onChange={(e) => setPublicUserEmail(e.target.value)}
+                      placeholder="Enter your email"
+                      className={`flex-1 bg-transparent border-none outline-none text-base ${
+                        theme === 'light' ? 'text-gray-900 placeholder-gray-500' : 'text-white placeholder-gray-400'
+                      }`}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-4">
+                    <input
+                      type="text"
+                      value={publicUserMessage}
+                      onChange={(e) => setPublicUserMessage(e.target.value)}
+                      placeholder="What's on your mind?"
+                      className={`flex-1 bg-transparent border-none outline-none text-base ${
+                        theme === 'light' ? 'text-gray-900 placeholder-gray-500' : 'text-white placeholder-gray-400'
+                      }`}
+                    />
+                    <button
+                      onClick={handlePublicChatSubmit}
+                      disabled={isCreatingAccount || !publicUserName.trim() || !publicUserEmail.trim() || !publicUserMessage.trim()}
+                      className="w-10 h-10 bg-pink-500 hover:bg-pink-600 rounded-full flex items-center justify-center transition disabled:opacity-50 disabled:cursor-not-allowed transform rotate-325"
+                    >
+                      {isCreatingAccount ? (
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      ) : (
+                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <p className={`text-center text-sm ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
+                  By continuing, you agree to create an account and start chatting with {chatUser.displayName || chatUser.name}
+                </p>
+              </>
+            ) : (
+              <>
+                <div className={`rounded-2xl p-6 text-center mb-4 ${
+                  theme === 'light' 
+                    ? 'bg-white/90 border border-gray-300' 
+                    : 'bg-white/10 backdrop-blur-md border border-white/20'
+                }`}>
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  
+                  <h3 className={`text-lg font-semibold mb-2 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+                    Check Your Email!
+                  </h3>
+                  
+                  <p className={`text-sm mb-4 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
+                    We sent a verification link to <strong>{publicUserEmail}</strong>
+                  </p>
+                  
+                  <p className={`text-sm ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
+                    Click the link in your email to verify your account and send your message to {chatUser.displayName || chatUser.name}.
+                  </p>
+                </div>
+
+                <p className={`text-center text-sm ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
+                  Didn't receive the email? Check your spam folder or try refreshing the page to send again.
+                </p>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     );
   }
@@ -1024,12 +1347,12 @@ export default function ChatPage() {
             <button
               onClick={handleSendMessage}
               disabled={sending || uploadingImage || (!newMessage.trim() && !selectedImage)}
-              className="w-10 h-10 shrink-0 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-10 h-10 shrink-0 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed transform rotate-325"
             >
               {uploadingImage ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
               ) : (
-                <svg className="w-5 h-5 text-white rotate-320" fill="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                 </svg>
               )}

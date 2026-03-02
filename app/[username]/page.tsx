@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useBackground } from '@/hooks/useBackground';
 import { useTheme } from '@/hooks/useTheme';
-import { getLinkIcon, getLinkIconBgColor } from '@/utils/linkIcons';
+import { getLinkIconBgColor } from '@/utils/linkIcons';
 import Image from 'next/image';
 import publicApi from '@/lib/publicApi';
 import toast from 'react-hot-toast';
@@ -55,7 +55,7 @@ export default function UsernamePage() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [signupName, setSignupName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
-  const [pendingAction, setPendingAction] = useState<'follow' | 'followers' | 'following' | 'tarpup' | null>(null);
+  const [pendingAction, setPendingAction] = useState<'follow' | 'followers' | 'following' | null>(null);
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
   // Debug: Log showLoginModal state changes
@@ -63,10 +63,34 @@ export default function UsernamePage() {
     console.log('showLoginModal state changed:', showLoginModal);
   }, [showLoginModal]);
 
+  // Debug: Log pendingAction state changes
+  useEffect(() => {
+    console.log('pendingAction state changed:', pendingAction);
+  }, [pendingAction]);
+
   useEffect(() => {
     // Allow unauthenticated access - just fetch the profile
     fetchProfile();
   }, [username]);
+
+  // Check for verification success and refresh follow status
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const verified = urlParams.get('verified');
+    const action = urlParams.get('action');
+    
+    if (verified === 'true' && action === 'follow' && currentUser) {
+      // Refresh the follow status after verification
+      console.log('Verification completed, refreshing follow status...');
+      setTimeout(() => {
+        fetchProfile(); // This will refresh the follow status
+      }, 500);
+      
+      // Clean up URL parameters
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [currentUser]);
 
   const fetchProfile = async () => {
     try {
@@ -114,7 +138,9 @@ export default function UsernamePage() {
       if (currentUser) {
         console.log('Fetching following list...');
         try {
-          const followingResponse = await publicApi.get('/follows/following');
+          // Import and use authenticated API for follow status
+          const { default: api } = await import('@/lib/api');
+          const followingResponse = await api.get('/follows/following');
           console.log('Following response:', followingResponse.data);
           
           // Get the actual user ID from the detailed response
@@ -128,7 +154,20 @@ export default function UsernamePage() {
           console.log('Am I following this user:', isCurrentlyFollowing);
           setIsFollowing(isCurrentlyFollowing);
         } catch (error) {
-          console.log('Could not fetch follow status');
+          console.log('Could not fetch follow status with authenticated API, trying public API...');
+          // Fallback to publicApi if authenticated API fails
+          try {
+            const followingResponse = await publicApi.get('/follows/following');
+            console.log('Following response (public):', followingResponse.data);
+            
+            const targetUserId = userDetailResponse.data._id || userDetailResponse.data.id;
+            const followingIds = followingResponse.data.following?.map((f: any) => f._id || f.id) || [];
+            const isCurrentlyFollowing = followingIds.includes(targetUserId);
+            console.log('Am I following this user (public check):', isCurrentlyFollowing);
+            setIsFollowing(isCurrentlyFollowing);
+          } catch (publicError) {
+            console.log('Could not fetch follow status with either API');
+          }
         }
       }
 
@@ -156,15 +195,19 @@ export default function UsernamePage() {
     console.log('=== handleFollowToggle called ===');
     console.log('profileUser:', profileUser);
     console.log('currentUser:', currentUser);
+    console.log('localStorage token:', localStorage.getItem('token'));
     
     if (!profileUser) {
       console.log('No profileUser, returning early');
       return;
     }
 
-    // Check if user is logged in first
-    if (!currentUser) {
-      console.log('No currentUser - showing login modal');
+    // Check both currentUser and localStorage token (same as other functions)
+    const hasAuth = currentUser && localStorage.getItem('token');
+    
+    if (!hasAuth) {
+      console.log('No authentication - showing login modal');
+      console.log('Setting pendingAction to: follow');
       setPendingAction('follow');
       setShowLoginModal(true);
       console.log('showLoginModal state set to true');
@@ -274,6 +317,7 @@ export default function UsernamePage() {
     
     if (!hasAuth) {
       console.log('No authentication - showing login modal for followers');
+      console.log('Setting pendingAction to: followers');
       setPendingAction('followers');
       setShowLoginModal(true);
       console.log('showLoginModal set to:', true);
@@ -295,6 +339,7 @@ export default function UsernamePage() {
     
     if (!hasAuth) {
       console.log('No authentication - showing login modal for following');
+      console.log('Setting pendingAction to: following');
       setPendingAction('following');
       setShowLoginModal(true);
       console.log('showLoginModal set to:', true);
@@ -319,82 +364,49 @@ export default function UsernamePage() {
       return;
     }
     
+    // Capture the current pending action before any async operations
+    const currentPendingAction = pendingAction;
+    console.log('=== handleSignupSubmit called ===');
+    console.log('currentPendingAction:', currentPendingAction);
+    console.log('pendingAction state:', pendingAction);
+    
+    if (!currentPendingAction) {
+      toast.error('No action specified. Please try again.');
+      return;
+    }
+    
     setIsCreatingAccount(true);
     
     try {
-      // Map pendingAction to source string
-      const sourceMap = {
-        follow: 'profile_follow',
-        followers: 'profile_followers',
-        following: 'profile_following',
-        tarpup: 'profile_tarpup',
-      };
+      // Send verification link instead of creating account immediately
+      const profileUserId = profileUser?._id || profileUser?.id;
       
-      // Create account silently
-      const signupResponse = await publicApi.post('/auth/silent-signup', {
+      console.log('=== Sending verification email ===');
+      console.log('pendingAction:', currentPendingAction);
+      console.log('profileUserId:', profileUserId);
+      console.log('username:', username);
+      
+      await publicApi.post('/auth/create-pending-profile-user', {
         name: signupName,
         email: signupEmail,
-        password: Math.random().toString(36).slice(-8), // Generate random password
-        source: pendingAction ? sourceMap[pendingAction] : undefined,
-        referrerId: profileUser?._id || profileUser?.id,
+        profileUserId: profileUserId,
+        action: currentPendingAction,
+        profileUsername: username,
       });
       
-      console.log('Account created:', signupResponse.data);
+      console.log('Verification email sent for action:', currentPendingAction);
       
-      // Store token and user data
-      const { token, user } = signupResponse.data;
-      localStorage.setItem('token', token);
-      useAuthStore.getState().setAuth(user, token);
-      
-      // Close modal
+      // Close modal and show success message
       setShowLoginModal(false);
-      
-      // Execute the pending action
-      if (pendingAction === 'follow' && profileUser) {
-        // Trigger follow action directly with the new user
-        const targetUserId = profileUser._id || profileUser.id;
-        try {
-          await publicApi.post(`/follows/${targetUserId}`);
-          setIsFollowing(true);
-          setProfileUser({
-            ...profileUser,
-            followers: [...profileUser.followers, user.id],
-            followersCount: (profileUser.followersCount || 0) + 1,
-          });
-        } catch (error) {
-          console.error('Failed to follow:', error);
-        }
-      } else if (pendingAction === 'followers') {
-        setShowFollowersModal(true);
-        fetchFollowers();
-      } else if (pendingAction === 'following') {
-        setShowFollowingModal(true);
-        fetchFollowing();
-      } else if (pendingAction === 'tarpup' && profileUser) {
-        // For TarpUp, automatically follow the user first to enable chat
-        const targetUserId = profileUser._id || profileUser.id;
-        try {
-          await publicApi.post(`/follows/${targetUserId}`);
-          setIsFollowing(true);
-          setProfileUser({
-            ...profileUser,
-            followers: [...profileUser.followers, user.id],
-            followersCount: (profileUser.followersCount || 0) + 1,
-          });
-        } catch (error) {
-          console.error('Failed to follow:', error);
-        }
-        // Navigate to chat
-        router.push(`/chat/${targetUserId}`);
-      }
+      toast.success('Verification email sent! Please check your email to complete the action.');
       
       // Reset
       setPendingAction(null);
       setSignupName('');
       setSignupEmail('');
     } catch (error: any) {
-      console.error('Failed to create account:', error);
-      toast.error(error.response?.data?.message || 'Failed to create account');
+      console.error('Failed to send verification email:', error);
+      toast.error(error.response?.data?.message || 'Failed to send verification email');
     } finally {
       setIsCreatingAccount(false);
     }
@@ -552,7 +564,7 @@ export default function UsernamePage() {
 
           {/* TarpUp Button */}
           <button 
-            onClick={() => {
+            onClick={async () => {
               console.log('=== TarpUp button clicked ===');
               console.log('currentUser:', currentUser);
               console.log('localStorage token:', localStorage.getItem('token'));
@@ -561,16 +573,43 @@ export default function UsernamePage() {
               const hasAuth = currentUser && localStorage.getItem('token');
               
               if (!hasAuth) {
-                console.log('No authentication - showing login modal for tarpup');
-                setPendingAction('tarpup');
-                setShowLoginModal(true);
-                console.log('showLoginModal set to:', true);
+                console.log('No authentication - navigating to chat page');
+                const targetUserId = profileUser._id || profileUser.id;
+                router.push(`/chat/${targetUserId}`);
                 return;
               }
               
-              console.log('User is authenticated, navigating to chat');
+              console.log('User is authenticated, auto-following before chat');
               const targetUserId = profileUser._id || profileUser.id;
-              router.push(`/chat/${targetUserId}`);
+              
+              try {
+                // Auto-follow the user if not already following
+                if (!isFollowing) {
+                  console.log('Auto-following user before chat...');
+                  const { default: api } = await import('@/lib/api');
+                  await api.post(`/follows/${targetUserId}`);
+                  console.log('Successfully followed user');
+                  
+                  // Update local state
+                  setIsFollowing(true);
+                  setProfileUser({
+                    ...profileUser,
+                    followers: [...profileUser.followers, currentUser?.id || ''],
+                    followersCount: (profileUser.followersCount || 0) + 1,
+                  });
+                  
+                  // Wait a bit to ensure the follow relationship is properly saved
+                  console.log('Waiting for follow relationship to be saved...');
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                }
+                
+                // Navigate to chat
+                console.log('Navigating to chat');
+                router.push(`/chat/${targetUserId}`);
+              } catch (error) {
+                console.error('Failed to follow user:', error);
+                toast.error('Failed to follow user. Please try again.');
+              }
             }}
             className={` max-w-md backdrop-blur-md border-2 rounded-2xl py-2.5 px-10 flex items-center justify-center gap-2 transition mb-3 ${
               theme === 'light' 
@@ -862,16 +901,27 @@ export default function UsernamePage() {
 
       {/* Login Modal */}
       {showLoginModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center px-6" onClick={() => setShowLoginModal(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center px-6" onClick={() => {
+          console.log('Modal backdrop clicked - closing modal');
+          setShowLoginModal(false);
+        }}>
           <div className="bg-white rounded-2xl p-8 w-full max-w-md relative" onClick={(e) => e.stopPropagation()}>
             <button
-              onClick={() => setShowLoginModal(false)}
+              onClick={() => {
+                console.log('Modal close button clicked');
+                setShowLoginModal(false);
+              }}
               className="absolute top-6 right-6 text-gray-400 hover:text-gray-600"
             >
               ✕
             </button>
 
             <div className="space-y-4">
+              {/* Debug info */}
+              <div className="text-xs text-gray-500 bg-gray-100 p-2 rounded">
+                Debug: pendingAction = {pendingAction || 'null'}
+              </div>
+              
               <div>
                 <label htmlFor="loginName" className="block text-sm font-medium text-gray-700 mb-2">
                   Name
