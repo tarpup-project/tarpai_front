@@ -30,6 +30,14 @@ export default function SignupPage() {
       return;
     }
 
+    // Validate full name contains exactly two names (firstname and lastname)
+    const nameParts = name.trim().split(/\s+/);
+    if (nameParts.length !== 2) {
+      console.log('Validation failed: name must contain exactly two names');
+      toast.error('Please enter exactly two names (firstname and lastname)');
+      return;
+    }
+
     if (password.length < 6) {
       console.log('Validation failed: password too short');
       toast.error('Password must be at least 6 characters');
@@ -149,7 +157,7 @@ export default function SignupPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full bg-gray-900 border border-gray-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gray-700"
-                placeholder="Enter your full name"
+                placeholder="Enter firstname lastname"
                 required
                 disabled={codeSent}
               />

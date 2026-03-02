@@ -860,7 +860,7 @@ export default function UsernamePage() {
                   value={signupName}
                   onChange={(e) => setSignupName(e.target.value)}
                   className="w-full bg-gray-100 border border-gray-300 text-black rounded-lg px-4 py-3 focus:outline-none focus:border-gray-400"
-                  placeholder="Enter your name"
+                  placeholder="Enter your firstname"
                 />
               </div>
 
@@ -917,11 +917,6 @@ export default function UsernamePage() {
             </button>
 
             <div className="space-y-4">
-              {/* Debug info */}
-              <div className="text-xs text-gray-500 bg-gray-100 p-2 rounded">
-                Debug: pendingAction = {pendingAction || 'null'}
-              </div>
-              
               <div>
                 <label htmlFor="loginName" className="block text-sm font-medium text-gray-700 mb-2">
                   Name
@@ -932,7 +927,7 @@ export default function UsernamePage() {
                   value={signupName}
                   onChange={(e) => setSignupName(e.target.value)}
                   className="w-full bg-gray-100 border border-gray-300 text-black rounded-lg px-4 py-3 focus:outline-none focus:border-gray-400"
-                  placeholder="Enter your name"
+                  placeholder="Enter your firstname"
                 />
               </div>
 
