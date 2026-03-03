@@ -9,15 +9,17 @@ export const size = {
 
 export const contentType = 'image/png';
 
-export default async function Icon({ params }: { params: { username: string } }) {
+export default async function Icon({ params }: { params: Promise<{ username: string }> }) {
+  const { username } = await params;
+  
   try {
     // Fetch user data
     const response = await fetch(
-      `https://tarpai-back-x753.onrender.com/users?username=${params.username}`,
+      `https://tarpai-back-x753.onrender.com/users?username=${username}`,
       { cache: 'no-store' }
     );
     const users = await response.json();
-    const user = users.find((u: any) => u.username === params.username);
+    const user = users.find((u: any) => u.username === username);
     
     if (!user || !user.avatar) {
       // Return default icon if user not found

@@ -10,12 +10,14 @@ export const size = {
  
 export const contentType = 'image/png';
  
-export default async function Image({ params }: { params: { username: string } }) {
+export default async function Image({ params }: { params: Promise<{ username: string }> }) {
+  const { username } = await params;
+  
   try {
     // Fetch user data
-    const response = await fetch(`https://tarpai-back-x753.onrender.com/users?username=${params.username}`);
+    const response = await fetch(`https://tarpai-back-x753.onrender.com/users?username=${username}`);
     const users = await response.json();
-    const user = users.find((u: any) => u.username === params.username);
+    const user = users.find((u: any) => u.username === username);
     
     if (!user) {
       return new ImageResponse(

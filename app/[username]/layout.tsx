@@ -1,12 +1,12 @@
 import { Metadata } from 'next';
 
 type Props = {
-  params: { username: string };
+  params: Promise<{ username: string }>;
   children: React.ReactNode;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { username } = params;
+  const { username } = await params;
   
   try {
     // Fetch user data
