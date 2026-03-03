@@ -1361,30 +1361,25 @@ export default function ChatPage() {
                           )}
                           <div className="p-3">
                             <div className="flex items-start gap-2">
-                              {message.linkPreview.favicon ? (
-                                <Image
-                                  src={message.linkPreview.favicon}
-                                  alt="favicon"
-                                  width={16}
-                                  height={16}
-                                  className="w-4 h-4 mt-0.5 flex-shrink-0"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    // Replace with link icon on error
-                                    const parent = target.parentElement;
-                                    if (parent) {
+                              <div className="w-4 h-4 mt-0.5 flex-shrink-0">
+                                {message.linkPreview.favicon ? (
+                                  <Image
+                                    src={message.linkPreview.favicon}
+                                    alt="favicon"
+                                    width={16}
+                                    height={16}
+                                    className="w-4 h-4"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
                                       target.style.display = 'none';
-                                      const linkIcon = document.createElement('div');
-                                      linkIcon.innerHTML = `<svg class="w-4 h-4 ${isOwn ? 'text-gray-600' : 'text-gray-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>`;
-                                      parent.appendChild(linkIcon.firstChild!);
-                                    }
-                                  }}
-                                />
-                              ) : (
-                                <svg className={`w-4 h-4 mt-0.5 flex-shrink-0 ${isOwn ? 'text-gray-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                                </svg>
-                              )}
+                                    }}
+                                  />
+                                ) : (
+                                  <svg className={`w-4 h-4 ${isOwn ? 'text-gray-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                  </svg>
+                                )}
+                              </div>
                               <div className="flex-1 min-w-0">
                                 {message.linkPreview.siteName && (
                                   <p className={`text-xs mb-1 ${isOwn ? 'text-gray-600' : 'text-gray-400'}`}>
