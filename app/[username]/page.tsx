@@ -7,7 +7,6 @@ import { useBackground } from '@/hooks/useBackground';
 import { useTheme } from '@/hooks/useTheme';
 import { getLinkIconBgColor } from '@/utils/linkIcons';
 import Image from 'next/image';
-import Head from 'next/head';
 import publicApi from '@/lib/publicApi';
 import toast from 'react-hot-toast';
 import AvatarPreview from '@/components/AvatarPreview';
@@ -426,32 +425,7 @@ export default function UsernamePage() {
   }
 
   return (
-    <>
-      <Head>
-        <title>{profileUser.displayName || profileUser.name} (@{profileUser.username}) - TarpAI</title>
-        <meta name="description" content={profileUser.bio || `Check out ${profileUser.displayName || profileUser.name}'s profile on TarpAI`} />
-        
-        {/* Open Graph / Facebook */}
-        <meta property="og:type" content="profile" />
-        <meta property="og:url" content={`https://tarpai.onrender.com/${profileUser.username}`} />
-        <meta property="og:title" content={`${profileUser.displayName || profileUser.name} (@${profileUser.username})`} />
-        <meta property="og:description" content={profileUser.bio || `Check out ${profileUser.displayName || profileUser.name}'s profile on TarpAI`} />
-        <meta property="og:image" content={profileUser.avatar} />
-        <meta property="og:image:width" content="400" />
-        <meta property="og:image:height" content="400" />
-        
-        {/* Twitter */}
-        <meta property="twitter:card" content="summary" />
-        <meta property="twitter:url" content={`https://tarpai.onrender.com/${profileUser.username}`} />
-        <meta property="twitter:title" content={`${profileUser.displayName || profileUser.name} (@${profileUser.username})`} />
-        <meta property="twitter:description" content={profileUser.bio || `Check out ${profileUser.displayName || profileUser.name}'s profile on TarpAI`} />
-        <meta property="twitter:image" content={profileUser.avatar} />
-        
-        {/* Favicon */}
-        <link rel="icon" href={profileUser.avatar} />
-      </Head>
-      
-      <div 
+    <div 
         className={`min-h-screen relative overflow-hidden ${
           theme === 'dark' ? 'text-white' : 'text-black'
         }`}
@@ -993,6 +967,5 @@ export default function UsernamePage() {
         </div>
       )}
       </div>
-    </>
   );
 }
