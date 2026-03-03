@@ -73,6 +73,32 @@ export default function UsernamePage() {
     fetchProfile();
   }, [username]);
 
+  // Re-check follow status when currentUser becomes available
+  useEffect(() => {
+    if (currentUser && profileUser) {
+      console.log('CurrentUser loaded, checking follow status...');
+      checkFollowStatus();
+    }
+  }, [currentUser, profileUser]);
+
+  const checkFollowStatus = async () => {
+    if (!currentUser || !profileUser) return;
+    
+    try {
+      const { default: api } = await import('@/lib/api');
+      const followingResponse = await api.get('/follows/following');
+      console.log('Following response:', followingResponse.data);
+      
+      const targetUserId = profileUser._id || profileUser.id;
+      const followingIds = followingResponse.data.following?.map((f: any) => f._id || f.id) || [];
+      const isCurrentlyFollowing = followingIds.includes(targetUserId);
+      console.log('Am I following this user:', isCurrentlyFollowing);
+      setIsFollowing(isCurrentlyFollowing);
+    } catch (error) {
+      console.log('Could not fetch follow status:', error);
+    }
+  };
+
   // Check for verification success and refresh follow status
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
