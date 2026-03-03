@@ -32,10 +32,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const avatarUrl = user.avatar.startsWith('http') 
       ? user.avatar 
       : `https://tarpai.onrender.com${user.avatar}`;
+    
+    // Detect image type from URL
+    const imageType = avatarUrl.includes('.png') ? 'image/png' : 
+                      avatarUrl.includes('.jpg') || avatarUrl.includes('.jpeg') ? 'image/jpeg' :
+                      'image/jpeg'; // default to jpeg
 
     return {
       title,
       description,
+      metadataBase: new URL('https://tarpai.onrender.com'),
       openGraph: {
         type: 'profile',
         url: profileUrl,
@@ -45,12 +51,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         images: [
           {
             url: avatarUrl,
+            secureUrl: avatarUrl,
             width: 1200,
             height: 1200,
             alt: `${user.displayName || user.name}'s avatar`,
-            type: 'image/png',
+            type: imageType,
           },
         ],
+        locale: 'en_US',
       },
       twitter: {
         card: 'summary_large_image',
@@ -58,6 +66,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         description,
         images: [avatarUrl],
         site: '@tarpai',
+        creator: `@${user.username}`,
       },
       icons: {
         icon: avatarUrl,
