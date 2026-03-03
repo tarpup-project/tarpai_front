@@ -26,13 +26,7 @@ export default function LoginPage() {
       
       setAuth(user, token);
       toast.success('Welcome back!');
-      
-      // Check if user has completed profile setup
-      if (!user.displayName || !user.username) {
-        router.push('/setup-profile');
-      } else {
-        router.push('/dashboard');
-      }
+      router.push('/dashboard');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Login failed');
     } finally {

@@ -46,6 +46,13 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Prevent zoom on input focus on iOS */
+input,
+textarea,
+select {
+  font-size: 16px !important;
+}
+
 @keyframes slide-up {
   from {
     transform: translateY(100%);

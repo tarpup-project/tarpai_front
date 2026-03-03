@@ -567,11 +567,11 @@ export default function ChannelPage() {
       {showCreatePostModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowCreatePostModal(false)}>
           <div 
-            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
+            className="bg-white rounded-t-3xl w-full max-h-[90vh] flex flex-col animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between mb-4">
+            <div className="p-6 border-b border-gray-200 flex-shrink-0">
+              <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold text-black">Create Post</h2>
                 <button
                   onClick={() => setShowCreatePostModal(false)}
@@ -582,16 +582,17 @@ export default function ChannelPage() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-6 min-h-0">
               <textarea
                 value={newPostContent}
                 onChange={(e) => setNewPostContent(e.target.value)}
                 placeholder="What's on your mind?"
-                className="w-full h-32 px-3 py-2 border border-gray-200 bg-gray-100 text-black text-sm placeholder-gray-400 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-300 resize-none"
+                className="w-full min-h-[120px] max-h-[300px] px-3 py-2 border border-gray-200 bg-gray-100 text-black text-sm placeholder-gray-400 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-300 resize-none"
+                rows={5}
               />
             </div>
 
-            <div className="p-6 border-t border-gray-200">
+            <div className="p-6 border-t border-gray-200 flex-shrink-0">
               <button
                 onClick={handleCreatePost}
                 disabled={creatingPost || !newPostContent.trim()}

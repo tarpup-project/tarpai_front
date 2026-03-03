@@ -19,7 +19,7 @@ function GoogleCallbackContent() {
         const user = JSON.parse(decodeURIComponent(userStr));
         setAuth(user, token);
         toast.success('Successfully signed in with Google!');
-        router.push('/setup-profile');
+        router.push('/dashboard');
       } catch (error) {
         toast.error('Failed to process Google sign in');
         router.push('/login');

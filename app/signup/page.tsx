@@ -96,7 +96,7 @@ export default function SignupPage() {
       
       setAuth(user, token);
       toast.success('Account created successfully!');
-      router.push('/setup-profile');
+      router.push('/dashboard');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Verification failed');
     } finally {
@@ -206,7 +206,7 @@ export default function SignupPage() {
                   type="text"
                   value={verificationCode}
                   onChange={(e) => setVerificationCode(e.target.value)}
-                  className="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gray-700"
+                  className="flex-1 min-w-0 bg-gray-900 border border-gray-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gray-700"
                   placeholder="Enter code"
                   maxLength={6}
                   disabled={!codeSent}
@@ -215,9 +215,9 @@ export default function SignupPage() {
                   type="button"
                   onClick={handleGetCode}
                   disabled={sendingCode}
-                  className="bg-gray-800 text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  className="flex-shrink-0 bg-gray-800 text-white px-4 py-3 rounded-lg font-medium hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
-                  {sendingCode ? 'Sending...' : codeSent ? 'Resend Code' : 'Get Code'}
+                  {sendingCode ? 'Sending...' : codeSent ? 'Resend' : 'Get Code'}
                 </button>
               </div>
               {codeSent && (
