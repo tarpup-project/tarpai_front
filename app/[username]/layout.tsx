@@ -27,6 +27,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const title = `${user.displayName || user.name} (@${user.username}) - TarpAI`;
     const description = user.bio || `Check out ${user.displayName || user.name}'s profile on TarpAI`;
     const profileUrl = `https://tarpai.onrender.com/${user.username}`;
+    
+    // Ensure avatar URL is absolute
+    const avatarUrl = user.avatar.startsWith('http') 
+      ? user.avatar 
+      : `https://tarpai.onrender.com${user.avatar}`;
 
     return {
       title,
@@ -36,25 +41,28 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         url: profileUrl,
         title,
         description,
+        siteName: 'TarpAI',
         images: [
           {
-            url: user.avatar,
-            width: 400,
-            height: 400,
+            url: avatarUrl,
+            width: 1200,
+            height: 1200,
             alt: `${user.displayName || user.name}'s avatar`,
+            type: 'image/png',
           },
         ],
       },
       twitter: {
-        card: 'summary',
+        card: 'summary_large_image',
         title,
         description,
-        images: [user.avatar],
+        images: [avatarUrl],
+        site: '@tarpai',
       },
       icons: {
-        icon: user.avatar,
-        shortcut: user.avatar,
-        apple: user.avatar,
+        icon: avatarUrl,
+        shortcut: avatarUrl,
+        apple: avatarUrl,
       },
     };
   } catch (error) {
