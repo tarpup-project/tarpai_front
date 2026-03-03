@@ -20,6 +20,14 @@ interface Message {
   type?: string;
   fileUrl?: string;
   createdAt: string;
+  linkPreview?: {
+    url: string;
+    title?: string;
+    description?: string;
+    image?: string;
+    favicon?: string;
+    siteName?: string;
+  };
   replyTo?: {
     _id: string;
     sender: string;
@@ -392,6 +400,7 @@ export default function ChatPage() {
             type: message.type,
             fileUrl: message.fileUrl,
             createdAt: message.createdAt,
+            linkPreview: message.linkPreview,
             replyTo: message.replyTo ? {
               _id: message.replyTo.id,
               sender: message.replyTo.sender,
@@ -437,6 +446,7 @@ export default function ChatPage() {
           type: msg.type,
           fileUrl: msg.fileUrl,
           createdAt: msg.createdAt,
+          linkPreview: msg.linkPreview,
           replyTo: msg.replyTo ? {
             _id: msg.replyTo.id,
             sender: msg.replyTo.sender,
@@ -467,6 +477,44 @@ export default function ChatPage() {
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
+  };
+
+  // Helper function to detect and render links
+  const renderMessageContent = (content: string, hasLinkPreview: boolean = false) => {
+    // If there's a link preview, don't render the URL as a link in the text
+    if (hasLinkPreview) {
+      // URL regex pattern
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      // Remove URLs from content when there's a preview
+      const contentWithoutUrls = content.replace(urlRegex, '').trim();
+      // If content is empty after removing URL, don't render anything
+      if (!contentWithoutUrls) {
+        return null;
+      }
+      return contentWithoutUrls;
+    }
+    
+    // No preview - render URLs as clickable links
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = content.split(urlRegex);
+    
+    return parts.map((part, index) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:opacity-80 break-all"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part}
+          </a>
+        );
+      }
+      return <span key={index}>{part}</span>;
+    });
   };
 
   const handleSendMessage = async () => {
@@ -1234,12 +1282,108 @@ export default function ChatPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex flex-wrap items-end gap-2">
-                      <p className="flex-1 min-w-0">{message.content}</p>
-                      <span className={`text-xs whitespace-nowrap ml-auto ${isOwn ? 'opacity-60' : 'opacity-70'}`}>
-                        {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
+                    <>
+                      {(() => {
+                        const renderedContent = renderMessageContent(message.content, !!message.linkPreview);
+                        return renderedContent ? (
+                          <div className="flex flex-wrap items-end gap-2">
+                            <p className="flex-1 min-w-0">{renderedContent}</p>
+                            <span className={`text-xs whitespace-nowrap ml-auto ${isOwn ? 'opacity-60' : 'opacity-70'}`}>
+                              {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        ) : null;
+                      })()}
+                      
+                      {/* Link Preview Card */}
+                      {message.linkPreview && (
+                        <a
+                          href={message.linkPreview.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className={`${(() => {
+                            const renderedContent = renderMessageContent(message.content, !!message.linkPreview);
+                            return renderedContent ? 'mt-2' : '';
+                          })()} block rounded-lg overflow-hidden border ${
+                            isOwn 
+                              ? 'border-gray-200 bg-gray-50' 
+                              : theme === 'light'
+                                ? 'border-gray-600 bg-gray-700'
+                                : 'border-white/20 bg-white/5'
+                          } hover:opacity-90 transition`}
+                        >
+                          {message.linkPreview.image && (
+                            <div className="w-full h-40 overflow-hidden bg-gray-200">
+                              <Image
+                                src={message.linkPreview.image}
+                                alt={message.linkPreview.title || 'Link preview'}
+                                width={400}
+                                height={200}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          )}
+                          <div className="p-3">
+                            <div className="flex items-start gap-2">
+                              {message.linkPreview.favicon ? (
+                                <Image
+                                  src={message.linkPreview.favicon}
+                                  alt="favicon"
+                                  width={16}
+                                  height={16}
+                                  className="w-4 h-4 mt-0.5 flex-shrink-0"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    // Replace with link icon on error
+                                    const parent = target.parentElement;
+                                    if (parent) {
+                                      target.style.display = 'none';
+                                      const linkIcon = document.createElement('div');
+                                      linkIcon.innerHTML = `<svg class="w-4 h-4 ${isOwn ? 'text-gray-600' : 'text-gray-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>`;
+                                      parent.appendChild(linkIcon.firstChild!);
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <svg className={`w-4 h-4 mt-0.5 flex-shrink-0 ${isOwn ? 'text-gray-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                </svg>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                {message.linkPreview.siteName && (
+                                  <p className={`text-xs mb-1 ${isOwn ? 'text-gray-600' : 'text-gray-400'}`}>
+                                    {message.linkPreview.siteName}
+                                  </p>
+                                )}
+                                {message.linkPreview.title && (
+                                  <p className={`text-sm font-semibold mb-1 line-clamp-2 ${isOwn ? 'text-gray-900' : 'text-white'}`}>
+                                    {message.linkPreview.title}
+                                  </p>
+                                )}
+                                {message.linkPreview.description && (
+                                  <p className={`text-xs line-clamp-2 ${isOwn ? 'text-gray-600' : 'text-gray-400'}`}>
+                                    {message.linkPreview.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          {/* Show timestamp at bottom of preview card if no text content */}
+                          {!renderMessageContent(message.content, !!message.linkPreview) && (
+                            <div className="px-3 pb-2 flex justify-end">
+                              <span className={`text-xs whitespace-nowrap ${isOwn ? 'opacity-60' : 'opacity-70'}`}>
+                                {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          )}
+                        </a>
+                      )}
+                    </>
                   )}
                   
                   {/* Reply icon that appears during swipe */}
