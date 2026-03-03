@@ -1008,8 +1008,8 @@ export default function ChatsPage() {
                           >
                             <div className="flex items-start gap-3 mb-3">
                               <Image
-                                src={broadcast.sender.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
-                                alt={broadcast.sender.name}
+                                src={broadcast.sender?.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
+                                alt={broadcast.sender?.name || 'User'}
                                 width={40}
                                 height={40}
                                 className="w-10 h-10 rounded-full object-cover"
@@ -1017,13 +1017,13 @@ export default function ChatsPage() {
                               <div className="flex-1">
                                 <div className="flex items-center justify-between mb-1">
                                   <h3 className={`font-semibold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
-                                    {broadcast.sender.displayName || broadcast.sender.name}
+                                    {broadcast.sender?.displayName || broadcast.sender?.name || 'Unknown User'}
                                   </h3>
                                   <span className={`text-xs ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
                                     {new Date(broadcast.createdAt).toLocaleDateString()}
                                   </span>
                                 </div>
-                                {broadcast.sender.username && (
+                                {broadcast.sender?.username && (
                                   <p className={`text-sm mb-2 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>@{broadcast.sender.username}</p>
                                 )}
                               </div>
