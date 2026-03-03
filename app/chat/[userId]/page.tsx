@@ -139,10 +139,38 @@ export default function ChatPage() {
       }
     };
 
+    // Handle page visibility changes (tab switching, minimizing)
+    const handleVisibilityChange = () => {
+      if (document.hidden && socketRef.current) {
+        const conversationId = (socketRef.current as any).conversationId;
+        console.log('=== PAGE HIDDEN - Emitting leave_conversation ===');
+        console.log('Conversation ID:', conversationId);
+        if (conversationId) {
+          socketRef.current.emit('leave_conversation', { conversationId });
+        }
+      }
+    };
+
+    // Handle beforeunload (page close/refresh)
+    const handleBeforeUnload = () => {
+      if (socketRef.current) {
+        const conversationId = (socketRef.current as any).conversationId;
+        console.log('=== PAGE UNLOAD - Emitting leave_conversation ===');
+        console.log('Conversation ID:', conversationId);
+        if (conversationId) {
+          socketRef.current.emit('leave_conversation', { conversationId });
+        }
+      }
+    };
+
     window.addEventListener('popstate', handlePopState);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       window.removeEventListener('popstate', handlePopState);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
 
@@ -185,9 +213,12 @@ export default function ChatPage() {
       initializeChat();
     }
 
+    // Cleanup function
     return () => {
+      console.log('=== CHAT PAGE CLEANUP ===');
       if (socketRef.current) {
         const conversationId = (socketRef.current as any).conversationId;
+        console.log('Emitting leave_conversation for:', conversationId);
         if (conversationId) {
           socketRef.current.emit('leave_conversation', { conversationId });
         }
