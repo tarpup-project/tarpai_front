@@ -10,6 +10,7 @@ import Image from 'next/image';
 import publicApi from '@/lib/publicApi';
 import toast from 'react-hot-toast';
 import AvatarPreview from '@/components/AvatarPreview';
+import BottomNav from '@/components/BottomNav';
 
 interface Link {
   _id: string;
@@ -72,6 +73,14 @@ export default function UsernamePage() {
     // Allow unauthenticated access - just fetch the profile
     fetchProfile();
   }, [username]);
+
+  // Redirect to dashboard if user is viewing their own profile
+  useEffect(() => {
+    if (currentUser && currentUser.username === username) {
+      console.log('User is viewing their own profile, redirecting to dashboard...');
+      router.push('/dashboard');
+    }
+  }, [currentUser, username]);
 
   // Re-check follow status when currentUser becomes available
   useEffect(() => {
@@ -307,9 +316,22 @@ export default function UsernamePage() {
     if (!profileUser || !currentUser) return;
     setFollowersLoading(true);
     try {
+      const { default: api } = await import('@/lib/api');
       const targetUserId = profileUser._id || profileUser.id;
-      const response = await publicApi.get(`/follows/followers/${targetUserId}`);
-      setFollowers(response.data.followers || []);
+      const response = await api.get(`/follows/followers/${targetUserId}`);
+      
+      // Sort followers to put current user first
+      const followersList = response.data.followers || [];
+      const currentUserId = currentUser.id;
+      const sortedFollowers = followersList.sort((a: any, b: any) => {
+        const aId = a._id || a.id;
+        const bId = b._id || b.id;
+        if (aId === currentUserId) return -1;
+        if (bId === currentUserId) return 1;
+        return 0;
+      });
+      
+      setFollowers(sortedFollowers);
     } catch (error) {
       console.error('Failed to fetch followers:', error);
       toast.error('Failed to load followers');
@@ -322,9 +344,22 @@ export default function UsernamePage() {
     if (!profileUser || !currentUser) return;
     setFollowingLoading(true);
     try {
+      const { default: api } = await import('@/lib/api');
       const targetUserId = profileUser._id || profileUser.id;
-      const response = await publicApi.get(`/follows/following/${targetUserId}`);
-      setFollowing(response.data.following || []);
+      const response = await api.get(`/follows/following/${targetUserId}`);
+      
+      // Sort following to put current user first
+      const followingList = response.data.following || [];
+      const currentUserId = currentUser.id;
+      const sortedFollowing = followingList.sort((a: any, b: any) => {
+        const aId = a._id || a.id;
+        const bId = b._id || b.id;
+        if (aId === currentUserId) return -1;
+        if (bId === currentUserId) return 1;
+        return 0;
+      });
+      
+      setFollowing(sortedFollowing);
     } catch (error) {
       console.error('Failed to fetch following:', error);
       toast.error('Failed to load following');
@@ -992,6 +1027,39 @@ export default function UsernamePage() {
           </div>
         </div>
       )}
-      </div>
+
+      {/* Bottom Navigation */}
+      {currentUser ? (
+        <BottomNav />
+      ) : (
+        /* Home button for non-logged-in users */
+        <div className="fixed bottom-6 right-6 z-50">
+          <button
+            onClick={() => router.push('/login')}
+            className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 ${
+              theme === 'light'
+                ? 'bg-white text-black border-2 border-gray-300'
+                : 'bg-white/90 text-black'
+            }`}
+            aria-label="Go to login"
+          >
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+              />
+            </svg>
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
+

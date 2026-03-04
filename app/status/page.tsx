@@ -28,6 +28,17 @@ interface Status {
   isLiked: boolean;
 }
 
+interface GroupedStatus {
+  author: {
+    _id: string;
+    name: string;
+    avatar: string;
+    username?: string;
+  };
+  statuses: Status[];
+  latestTime: string;
+}
+
 interface StatusDetail extends Status {
   // Additional fields that might come from the detail endpoint
 }
@@ -37,10 +48,11 @@ export default function StatusPage() {
   const user = useAuthStore((state) => state.user);
   const { background } = useBackground();
   const { theme } = useTheme();
-  const [statuses, setStatuses] = useState<Status[]>([]);
+  const [statuses, setStatuses] = useState<GroupedStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [selectedStatus, setSelectedStatus] = useState<StatusDetail | null>(null);
+  const [selectedStatusGroup, setSelectedStatusGroup] = useState<GroupedStatus | null>(null);
+  const [currentStatusIndex, setCurrentStatusIndex] = useState(0);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showRepostModal, setShowRepostModal] = useState(false);
   const [repostContent, setRepostContent] = useState('');
@@ -53,6 +65,7 @@ export default function StatusPage() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [showControls, setShowControls] = useState(true);
 
   // Check authentication immediately using localStorage
   useEffect(() => {
@@ -76,7 +89,34 @@ export default function StatusPage() {
   const fetchStatuses = async () => {
     try {
       const response = await api.get('/status/feed');
-      setStatuses(response.data);
+      // Group statuses by author
+      const grouped = response.data.reduce((acc: any, status: Status) => {
+        const authorId = status.author._id;
+        if (!acc[authorId]) {
+          acc[authorId] = {
+            author: status.author,
+            statuses: [],
+            latestTime: status.createdAt,
+          };
+        }
+        acc[authorId].statuses.push(status);
+        // Update latest time if this status is newer
+        if (new Date(status.createdAt) > new Date(acc[authorId].latestTime)) {
+          acc[authorId].latestTime = status.createdAt;
+        }
+        return acc;
+      }, {});
+      
+      // Convert to array and sort: current user first, then by latest status time
+      const groupedArray = Object.values(grouped).sort((a: any, b: any) => {
+        // Current user's statuses always come first
+        if (a.author._id === user?.id) return -1;
+        if (b.author._id === user?.id) return 1;
+        // Otherwise sort by latest time
+        return new Date(b.latestTime).getTime() - new Date(a.latestTime).getTime();
+      }) as GroupedStatus[];
+      
+      setStatuses(groupedArray);
     } catch (error) {
       console.error('Failed to fetch statuses:', error);
       toast.error('Failed to load statuses');
@@ -89,17 +129,27 @@ export default function StatusPage() {
     if (e) e.stopPropagation();
     try {
       await api.post(`/status/${statusId}/like`);
-      setStatuses(prev => prev.map(status => 
-        status.id === statusId 
-          ? { ...status, isLiked: !status.isLiked, likesCount: status.isLiked ? status.likesCount - 1 : status.likesCount + 1 }
-          : status
-      ));
-      if (selectedStatus && selectedStatus.id === statusId) {
-        setSelectedStatus(prev => prev ? {
+      
+      // Update in grouped statuses
+      setStatuses(prev => prev.map(group => ({
+        ...group,
+        statuses: group.statuses.map(status =>
+          status.id === statusId
+            ? { ...status, isLiked: !status.isLiked, likesCount: status.isLiked ? status.likesCount - 1 : status.likesCount + 1 }
+            : status
+        )
+      })));
+      
+      // Update in selected group
+      if (selectedStatusGroup) {
+        setSelectedStatusGroup(prev => prev ? ({
           ...prev,
-          isLiked: !prev.isLiked,
-          likesCount: prev.isLiked ? prev.likesCount - 1 : prev.likesCount + 1
-        } : null);
+          statuses: prev.statuses.map(status =>
+            status.id === statusId
+              ? { ...status, isLiked: !status.isLiked, likesCount: status.isLiked ? status.likesCount - 1 : status.likesCount + 1 }
+              : status
+          )
+        }) : null);
       }
     } catch (error) {
       console.error('Failed to like status:', error);
@@ -107,21 +157,64 @@ export default function StatusPage() {
     }
   };
 
-  const handleStatusClick = async (statusId: string) => {
-    try {
-      const response = await api.get(`/status/${statusId}`);
-      setSelectedStatus(response.data);
-      setShowStatusModal(true);
-    } catch (error) {
-      console.error('Failed to fetch status details:', error);
-      toast.error('Failed to load status');
+  const handleShare = (status: Status | StatusDetail) => {
+    const statusUrl = `${window.location.origin}/status/${status.id}`;
+    const shareText = `Check out this status from ${status.author.name}`;
+    
+    if (navigator.share) {
+      navigator.share({
+        title: shareText,
+        text: status.content,
+        url: statusUrl,
+      }).catch((error) => {
+        if (error.name !== 'AbortError') {
+          console.error('Error sharing:', error);
+        }
+      });
+    } else {
+      // Fallback: copy to clipboard
+      navigator.clipboard.writeText(statusUrl).then(() => {
+        toast.success('Status link copied to clipboard!');
+      }).catch((error) => {
+        console.error('Failed to copy:', error);
+        toast.error('Failed to copy link');
+      });
     }
   };
 
+  const handleStatusGroupClick = (group: GroupedStatus) => {
+    setSelectedStatusGroup(group);
+    setCurrentStatusIndex(0);
+    setShowStatusModal(true);
+    setShowControls(true); // Reset controls visibility when opening modal
+  };
+
+  const handleNextStatus = () => {
+    if (selectedStatusGroup && currentStatusIndex < selectedStatusGroup.statuses.length - 1) {
+      setCurrentStatusIndex(prev => prev + 1);
+    }
+  };
+
+  const handlePrevStatus = () => {
+    if (currentStatusIndex > 0) {
+      setCurrentStatusIndex(prev => prev - 1);
+    }
+  };
+
+  const toggleControls = () => {
+    setShowControls(prev => !prev);
+  };
+
+  const getCurrentStatus = (): Status | null => {
+    if (!selectedStatusGroup) return null;
+    return selectedStatusGroup.statuses[currentStatusIndex];
+  };
+
   const handleRepostNow = async () => {
-    if (!selectedStatus) return;
+    const currentStatus = getCurrentStatus();
+    if (!currentStatus) return;
     try {
-      await api.post(`/status/${selectedStatus.id}/repost`);
+      await api.post(`/status/${currentStatus.id}/repost`);
       toast.success('Reposted successfully!');
       setShowStatusModal(false);
       fetchStatuses();
@@ -133,19 +226,21 @@ export default function StatusPage() {
   };
 
   const handleEditRepost = () => {
-    if (!selectedStatus) return;
-    setRepostContent(selectedStatus.content);
+    const currentStatus = getCurrentStatus();
+    if (!currentStatus) return;
+    setRepostContent(currentStatus.content);
     setShowStatusModal(false);
     setShowRepostModal(true);
   };
 
   const handleConfirmRepost = async () => {
-    if (!selectedStatus) return;
+    const currentStatus = getCurrentStatus();
+    if (!currentStatus) return;
     try {
       const formData = new FormData();
       formData.append('content', repostContent);
       
-      await api.post(`/status/${selectedStatus.id}/edit-repost`, formData);
+      await api.post(`/status/${currentStatus.id}/edit-repost`, formData);
       toast.success('Reposted with edits successfully!');
       setShowRepostModal(false);
       setRepostContent('');
@@ -157,11 +252,12 @@ export default function StatusPage() {
   };
 
   const handleDeleteStatus = async () => {
-    if (!selectedStatus) return;
+    const currentStatus = getCurrentStatus();
+    if (!currentStatus) return;
     if (!confirm('Are you sure you want to delete this status?')) return;
     
     try {
-      await api.delete(`/status/${selectedStatus.id}`);
+      await api.delete(`/status/${currentStatus.id}`);
       toast.success('Status deleted successfully!');
       setShowStatusModal(false);
       fetchStatuses();
@@ -281,7 +377,13 @@ export default function StatusPage() {
     
     try {
       const response = await api.get(`/status/user/${userId}`);
-      setStatuses(response.data);
+      // Group the user's statuses
+      const grouped = [{
+        author: response.data[0]?.author || selectedUser,
+        statuses: response.data,
+        latestTime: response.data[0]?.createdAt || new Date().toISOString(),
+      }];
+      setStatuses(grouped);
     } catch (error) {
       console.error('Failed to fetch user statuses:', error);
       toast.error('Failed to load user statuses');
@@ -420,125 +522,68 @@ export default function StatusPage() {
           )}
         </div>
 
-        {/* Status Feed */}
+        {/* Status Feed - WhatsApp Style Grouped */}
         <div className="flex-1 px-2 pb-32 overflow-y-auto">
           <div className="columns-2 gap-3 space-y-3">
-            {statuses.map((status) => {
-              const layout = getImageLayout(status.images);
-              const hasMultipleImages = status.images.length > 1;
+            {statuses.map((group) => {
+              const firstStatus = group.statuses[0];
+              const statusCount = group.statuses.length;
+              const hasImage = firstStatus.images && firstStatus.images.length > 0;
               
               return (
                 <div
-                  key={status.id}
-                  onClick={() => handleStatusClick(status.id)}
+                  key={group.author._id}
+                  onClick={() => handleStatusGroupClick(group)}
                   className={`break-inside-avoid mb-3 ${theme === 'light' ? 'bg-white/40' : 'bg-white/10 border border-white/30'} backdrop-blur-md rounded-2xl overflow-hidden relative cursor-pointer hover:scale-[1.02] transition`}
                 >
-                  {/* Images */}
-                  <div className="relative">
-                    {layout === 'single' && (
+                  {/* First Status Image - Only show if image exists */}
+                  {hasImage && (
+                    <div className="relative">
                       <Image
-                        src={status.images[0]}
+                        src={firstStatus.images[0]}
                         alt="Status"
                         width={400}
                         height={400}
                         className="w-full h-64 object-cover"
                       />
-                    )}
-                    {layout === 'double' && (
-                      <div className="grid grid-cols-2 gap-0.5">
-                        {status.images.slice(0, 2).map((img, idx) => (
-                          <Image
-                            key={idx}
-                            src={img}
-                            alt="Status"
-                            width={200}
-                            height={200}
-                            className="w-full h-32 object-cover"
-                          />
-                        ))}
-                      </div>
-                    )}
-                    {layout === 'triple' && (
-                      <div className="grid grid-cols-2 gap-0.5">
-                        <Image
-                          src={status.images[0]}
-                          alt="Status"
-                          width={200}
-                          height={400}
-                          className="w-full h-64 object-cover row-span-2"
-                        />
-                        <Image
-                          src={status.images[1]}
-                          alt="Status"
-                          width={200}
-                          height={200}
-                          className="w-full h-32 object-cover"
-                        />
-                        <Image
-                          src={status.images[2]}
-                          alt="Status"
-                          width={200}
-                          height={200}
-                          className="w-full h-32 object-cover"
-                        />
-                      </div>
-                    )}
-                    {layout === 'quad' && (
-                      <div className="grid grid-cols-2 gap-0.5">
-                        {status.images.slice(0, 4).map((img, idx) => (
-                          <Image
-                            key={idx}
-                            src={img}
-                            alt="Status"
-                            width={200}
-                            height={200}
-                            className="w-full h-32 object-cover"
-                          />
-                        ))}
-                      </div>
-                    )}
-                    
-                    {/* Multiple images indicator */}
-                    {hasMultipleImages && (
-                      <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                        </svg>
-                        <span className="text-xs font-medium">{status.images.length}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Content */}
-                  <div className="p-3">
-                    <p className="text-sm mb-2 line-clamp-2">{status.content}</p>
-                    
-                    {/* Author and Like */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Image
-                          src={status.author.avatar}
-                          alt={status.author.name}
-                          width={24}
-                          height={24}
-                          className="w-6 h-6 rounded-full object-cover"
-                        />
-                        <span className="text-xs font-medium">{status.author.username || status.author.name}</span>
-                      </div>
                       
-                      <button
-                        onClick={(e) => handleLike(status.id, e)}
-                        className="flex items-center gap-1"
-                      >
-                        <svg 
-                          className={`w-5 h-5 ${status.isLiked ? 'fill-red-500 text-red-500' : 'fill-none'}`}
-                          stroke="currentColor" 
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                        </svg>
-                        <span className="text-xs">{status.likesCount}</span>
-                      </button>
+                      {/* Status count indicator */}
+                      {statusCount > 1 && (
+                        <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                          </svg>
+                          <span className="text-xs font-medium">{statusCount}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Author Info */}
+                  <div className="p-3">
+                    {/* Show count badge for text-only statuses */}
+                    {!hasImage && statusCount > 1 && (
+                      <div className="flex justify-end mb-2">
+                        <div className="bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                          </svg>
+                          <span className="text-xs font-medium">{statusCount}</span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <p className="text-sm mb-2 line-clamp-2">{firstStatus.content}</p>
+                    
+                    <div className="flex items-center gap-2">
+                      <Image
+                        src={group.author.avatar}
+                        alt={group.author.name}
+                        width={24}
+                        height={24}
+                        className="w-6 h-6 rounded-full object-cover"
+                      />
+                      <span className="text-xs font-medium">{group.author.username || group.author.name}</span>
                     </div>
                   </div>
                 </div>
@@ -664,34 +709,70 @@ export default function StatusPage() {
         </div>
       )}
 
-      {/* Status Detail Modal */}
-      {showStatusModal && selectedStatus && (
+      {/* Status Detail Modal - WhatsApp Style with Navigation */}
+      {showStatusModal && selectedStatusGroup && getCurrentStatus() && (
         <div 
           className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setShowStatusModal(false)}
         >
           <div 
-            className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto relative"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Progress Indicators */}
+            {showControls && (
+              <div className="absolute top-2 left-2 right-2 flex gap-1 z-10">
+                {selectedStatusGroup.statuses.map((_, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex-1 h-1 rounded-full ${
+                      idx === currentStatusIndex ? 'bg-white' : 'bg-white/30'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Navigation Arrows */}
+            {showControls && currentStatusIndex > 0 && (
+              <button
+                onClick={handlePrevStatus}
+                className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 backdrop-blur-sm text-white rounded-full p-2 z-10 hover:bg-black/80"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+            )}
+            {showControls && currentStatusIndex < selectedStatusGroup.statuses.length - 1 && (
+              <button
+                onClick={handleNextStatus}
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 backdrop-blur-sm text-white rounded-full p-2 z-10 hover:bg-black/80"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            )}
+
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
                 <Image
-                  src={selectedStatus.author.avatar}
-                  alt={selectedStatus.author.name}
+                  src={selectedStatusGroup.author.avatar}
+                  alt={selectedStatusGroup.author.name}
                   width={40}
                   height={40}
                   className="w-10 h-10 rounded-full object-cover"
                 />
                 <div>
-                  <p className="font-semibold text-black">{selectedStatus.author.name}</p>
-                  <p className="text-sm text-gray-500">@{selectedStatus.author.username || 'user'}</p>
+                  <p className="font-semibold text-black">{selectedStatusGroup.author.name}</p>
+                  <p className="text-sm text-gray-500">@{selectedStatusGroup.author.username || 'user'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">{getTimeAgo(selectedStatus.createdAt)}</span>
-                {selectedStatus.author._id === user?.id && (
+                <span className="text-sm text-gray-500">{getTimeAgo(getCurrentStatus()!.createdAt)}</span>
+                {getCurrentStatus()!.author._id === user?.id && (
                   <button
                     onClick={handleDeleteStatus}
                     className="text-red-500 hover:bg-red-50 p-2 rounded-full"
@@ -712,21 +793,21 @@ export default function StatusPage() {
               </div>
             </div>
 
-            {/* Images */}
-            {selectedStatus.images.length > 0 && (
-              <div className="space-y-0">
-                {selectedStatus.images.map((img, idx) => (
+            {/* Images - Only show if images exist */}
+            {getCurrentStatus()!.images && getCurrentStatus()!.images.length > 0 && (
+              <div className="space-y-0" onClick={toggleControls}>
+                {getCurrentStatus()!.images.map((img, idx) => (
                   <div key={idx} className="relative">
                     <Image
                       src={img}
                       alt={`Status image ${idx + 1}`}
                       width={600}
                       height={600}
-                      className="w-full h-auto object-cover"
+                      className="w-full h-auto object-cover cursor-pointer"
                     />
-                    {selectedStatus.images.length > 1 && (
+                    {showControls && getCurrentStatus()!.images.length > 1 && (
                       <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 text-white text-sm font-medium">
-                        {idx + 1}/{selectedStatus.images.length}
+                        {idx + 1}/{getCurrentStatus()!.images.length}
                       </div>
                     )}
                   </div>
@@ -735,25 +816,28 @@ export default function StatusPage() {
             )}
 
             {/* Content */}
-            <div className="p-4">
-              <p className="text-black mb-4">{selectedStatus.content}</p>
+            <div className="p-4 cursor-pointer" onClick={toggleControls}>
+              <p className="text-black mb-4">{getCurrentStatus()!.content}</p>
 
               {/* Like and Share */}
-              <div className="flex items-center gap-6 mb-4">
+              <div className="flex items-center gap-6 mb-4" onClick={(e) => e.stopPropagation()}>
                 <button
-                  onClick={() => handleLike(selectedStatus.id)}
+                  onClick={() => handleLike(getCurrentStatus()!.id)}
                   className="flex items-center gap-2"
                 >
                   <svg 
-                    className={`w-6 h-6 ${selectedStatus.isLiked ? 'fill-red-500 text-red-500' : 'fill-none text-gray-600'}`}
+                    className={`w-6 h-6 ${getCurrentStatus()!.isLiked ? 'fill-red-500 text-red-500' : 'fill-none text-gray-600'}`}
                     stroke="currentColor" 
                     viewBox="0 0 24 24"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
-                  <span className="text-black font-medium">{selectedStatus.likesCount}</span>
+                  <span className="text-black font-medium">{getCurrentStatus()!.likesCount}</span>
                 </button>
-                <button className="flex items-center gap-2 text-gray-600">
+                <button
+                  onClick={() => handleShare(getCurrentStatus()!)}
+                  className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition"
+                >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                   </svg>
@@ -761,8 +845,8 @@ export default function StatusPage() {
               </div>
 
               {/* Repost Buttons - Only show if not the author */}
-              {selectedStatus.author._id !== user?.id && (
-                <div className="space-y-2">
+              {getCurrentStatus()!.author._id !== user?.id && (
+                <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={handleRepostNow}
                     className="w-full bg-black text-white py-3 rounded-2xl font-semibold hover:bg-gray-800 transition flex items-center justify-center gap-2"
@@ -789,7 +873,7 @@ export default function StatusPage() {
       )}
 
       {/* Edit & Repost Modal */}
-      {showRepostModal && selectedStatus && (
+      {showRepostModal && getCurrentStatus() && (
         <div 
           className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setShowRepostModal(false)}
@@ -819,22 +903,24 @@ export default function StatusPage() {
               placeholder="Add your thoughts..."
             />
 
-            {/* Attachments */}
-            <div className="mb-4">
-              <p className="text-sm font-semibold text-gray-600 mb-2">ATTACHMENTS</p>
-              <div className="grid grid-cols-4 gap-2">
-                {selectedStatus.images.map((img, idx) => (
-                  <Image
-                    key={idx}
-                    src={img}
-                    alt="Attachment"
-                    width={100}
-                    height={100}
-                    className="w-full h-20 object-cover rounded-xl"
-                  />
-                ))}
+            {/* Attachments - Only show if images exist */}
+            {getCurrentStatus()!.images && getCurrentStatus()!.images.length > 0 && (
+              <div className="mb-4">
+                <p className="text-sm font-semibold text-gray-600 mb-2">ATTACHMENTS</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {getCurrentStatus()!.images.map((img, idx) => (
+                    <Image
+                      key={idx}
+                      src={img}
+                      alt="Attachment"
+                      width={100}
+                      height={100}
+                      className="w-full h-20 object-cover rounded-xl"
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Confirm Button */}
             <button
