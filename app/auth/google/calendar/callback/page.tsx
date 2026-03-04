@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 
-export default function GoogleCalendarCallbackPage() {
+function CalendarCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -80,5 +80,17 @@ export default function GoogleCalendarCallbackPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function GoogleCalendarCallbackPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white"></div>
+      </div>
+    }>
+      <CalendarCallbackContent />
+    </Suspense>
   );
 }
