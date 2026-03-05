@@ -203,12 +203,21 @@ export default function ChatsPage() {
       }
     }, 10000);
 
+    // Add window focus event listener for instant updates when returning to page
+    const handleFocus = () => {
+      fetchConversations();
+      registerChatsPageStatus(true);
+    };
+
+    window.addEventListener('focus', handleFocus);
+
     // Cleanup interval on unmount
     return () => {
       // Unregister from chats page
       registerChatsPageStatus(false);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
       if (interval) {
         clearInterval(interval);
       }
