@@ -134,7 +134,8 @@ export default function ChatPage() {
     // Handle browser back/forward navigation
     const handlePopState = () => {
       const currentPath = window.location.pathname;
-      if (currentPath === '/chats' || currentPath.startsWith('/chat/')) {
+      // Only reload if navigating to the chats page
+      if (currentPath === '/chats') {
         window.location.reload();
       }
     };

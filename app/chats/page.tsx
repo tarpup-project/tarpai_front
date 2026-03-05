@@ -124,12 +124,9 @@ export default function ChatsPage() {
   const [mainSearchQuery, setMainSearchQuery] = useState('');
 
   useEffect(() => {
-    // Handle browser back/forward navigation
-    const handlePopState = () => {
-      const currentPath = window.location.pathname;
-      if (currentPath === '/chats' || currentPath.startsWith('/chat/')) {
-        window.location.reload();
-      }
+    // Reload page on focus (when returning from chat page)
+    const handleFocusReload = () => {
+      window.location.reload();
     };
 
     // Handle URL parameter changes for tab switching
@@ -143,11 +140,11 @@ export default function ChatsPage() {
       }
     };
 
-    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('focus', handleFocusReload);
     window.addEventListener('popstate', handleUrlChange);
 
     return () => {
-      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('focus', handleFocusReload);
       window.removeEventListener('popstate', handleUrlChange);
     };
   }, []);
@@ -203,21 +200,12 @@ export default function ChatsPage() {
       }
     }, 10000);
 
-    // Add window focus event listener for instant updates when returning to page
-    const handleFocus = () => {
-      fetchConversations();
-      registerChatsPageStatus(true);
-    };
-
-    window.addEventListener('focus', handleFocus);
-
     // Cleanup interval on unmount
     return () => {
       // Unregister from chats page
       registerChatsPageStatus(false);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
       if (interval) {
         clearInterval(interval);
       }
@@ -424,7 +412,7 @@ export default function ChatsPage() {
     
     if (selectedUsers.length === 1) {
       // Single user - direct message
-      window.location.href = `/chat/${selectedUsers[0]}`;
+      router.push(`/chat/${selectedUsers[0]}`);
     } else {
       // Multiple users - create group
       try {
@@ -434,7 +422,7 @@ export default function ChatsPage() {
         
         toast.success(`Group created with ${selectedUsers.length} members`);
         // Navigate to the group conversation
-        window.location.href = `/chat/${response.data.id}`;
+        router.push(`/chat/${response.data.id}`);
       } catch (error: any) {
         console.error('Failed to create group:', error);
         toast.error(error.response?.data?.message || 'Failed to create group');
@@ -463,7 +451,7 @@ export default function ChatsPage() {
   };
 
   const handleChannelNavigation = (channelId: string) => {
-    window.location.href = `/channel/${channelId}?from=channels`;
+    router.push(`/channel/${channelId}?from=channels`);
   };
 
   // Add effect to fetch channels when switching to channels tab
@@ -718,7 +706,7 @@ export default function ChatsPage() {
                         key={conversation.id}
                         onClick={() => {
                           console.log('Navigating to:', `/chat/${navigationTarget}`);
-                          window.location.href = `/chat/${navigationTarget}`;
+                          router.push(`/chat/${navigationTarget}`);
                         }}
                         className={`${theme === 'light' ? 'bg-white/10' : 'bg-white/10'} backdrop-blur-md border ${theme === 'light' ? 'border-white/20' : 'border-white/10'} rounded-2xl p-4 flex items-center gap-4 ${theme === 'light' ? 'hover:bg-white/20' : 'hover:bg-white/20'} transition cursor-pointer`}
                       >
@@ -761,7 +749,7 @@ export default function ChatsPage() {
                             </p>
                           )}
                         </div>
-                        <div className="flex flex-col items-end gap-1">
+                        <div className="flex flex-col items-end gap-2 self-start">
                           <span className={`text-xs ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
                             {formatMessageTime(conversation.lastActivity)}
                           </span>
