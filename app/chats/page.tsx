@@ -1170,29 +1170,29 @@ export default function ChatsPage() {
       {showBroadcastModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowBroadcastModal(false)}>
           <div 
-            className={`bg-white rounded-t-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-slide-up`}
+            className="bg-white rounded-t-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div className="p-6 border-b border-gray-200">
               <div className="flex items-center gap-4">
                 <button
                   onClick={() => setShowBroadcastModal(false)}
-                  className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                  className="text-gray-600 hover:text-gray-900"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>New Broadcast</h2>
+                <h2 className="text-xl font-bold text-black">New Broadcast</h2>
               </div>
             </div>
 
             {/* To Field */}
-            <div className={`px-6 py-4 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div className="px-6 py-4 border-b border-gray-200">
               <div className="flex items-center gap-2">
-                <span className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'} font-medium`}>To:</span>
-                <span className={`${theme === 'dark' ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'} px-3 py-1 rounded-full text-sm font-medium`}>
+                <span className="text-gray-600 font-medium">To:</span>
+                <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
                   All Followers
                 </span>
               </div>
@@ -1205,14 +1205,14 @@ export default function ChatsPage() {
                 onChange={(e) => setBroadcastMessage(e.target.value)}
                 maxLength={500}
                 placeholder="What's on your mind? This message will be sent to all your followers."
-                className={`w-full h-full min-h-[300px] ${theme === 'dark' ? 'text-white placeholder-gray-500 bg-transparent' : 'text-black placeholder-gray-400 bg-transparent'} focus:outline-none resize-none text-lg`}
+                className="w-full h-full min-h-[300px] text-black placeholder-gray-400 bg-transparent focus:outline-none resize-none text-lg"
               />
             </div>
 
             {/* Footer */}
-            <div className={`p-6 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div className="p-6 border-t border-gray-200">
               <div className="flex items-center justify-between mb-4">
-                <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                <span className="text-sm text-gray-500">
                   {broadcastMessage.length}/500
                 </span>
               </div>
@@ -1220,7 +1220,7 @@ export default function ChatsPage() {
               <button
                 onClick={handleSendBroadcast}
                 disabled={sendingBroadcast || !broadcastMessage.trim()}
-                className={`w-full ${theme === 'dark' ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-800 text-white hover:bg-gray-700'} py-4 rounded-2xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
+                className="w-full bg-gray-800 text-white hover:bg-gray-700 py-4 rounded-2xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -1228,7 +1228,7 @@ export default function ChatsPage() {
                 {sendingBroadcast ? 'Sending...' : 'Send Broadcast'}
               </button>
               
-              <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-center mt-3`}>
+              <p className="text-xs text-gray-500 text-center mt-3">
                 Followers will receive a notification. Replies are disabled.
               </p>
             </div>
