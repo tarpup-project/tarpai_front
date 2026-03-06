@@ -238,7 +238,8 @@ export default function StatusPage() {
     if (!currentStatus) return;
     try {
       const formData = new FormData();
-      formData.append('content', repostContent);
+      // Only append content if it's not empty, otherwise send empty string
+      formData.append('content', repostContent?.trim() || '');
       
       await api.post(`/status/${currentStatus.id}/edit-repost`, formData);
       toast.success('Reposted with edits successfully!');
@@ -286,8 +287,8 @@ export default function StatusPage() {
     const newFiles = Array.from(files);
     const totalImages = selectedImages.length + newFiles.length;
 
-    if (totalImages > 4) {
-      toast.error('You can only upload up to 4 images');
+    if (totalImages > 7) {
+      toast.error('You can only upload up to 7 images');
       return;
     }
 
@@ -573,7 +574,9 @@ export default function StatusPage() {
                       </div>
                     )}
                     
-                    <p className="text-sm mb-2 line-clamp-2">{firstStatus.content}</p>
+                    {firstStatus.content && (
+                      <p className="text-sm mb-2 line-clamp-2 whitespace-pre-wrap">{firstStatus.content}</p>
+                    )}
                     
                     <div className="flex items-center gap-2">
                       <Image
@@ -645,7 +648,7 @@ export default function StatusPage() {
 
             {/* Image Previews */}
             {imagePreviewUrls.length > 0 && (
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-3 gap-2 mb-4">
                 {imagePreviewUrls.map((url, idx) => (
                   <div key={idx} className="relative">
                     <Image
@@ -653,11 +656,11 @@ export default function StatusPage() {
                       alt={`Preview ${idx + 1}`}
                       width={300}
                       height={300}
-                      className="w-full h-40 object-cover rounded-xl"
+                      className="w-full h-24 object-cover rounded-xl"
                     />
                     <button
                       onClick={() => handleRemoveImage(idx)}
-                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -681,7 +684,7 @@ export default function StatusPage() {
                   multiple
                   onChange={handleImageSelect}
                   className="hidden"
-                  disabled={selectedImages.length >= 4}
+                  disabled={selectedImages.length >= 7}
                 />
               </label>
 
@@ -757,7 +760,16 @@ export default function StatusPage() {
 
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <div className="flex items-center gap-3">
+              <div 
+                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (selectedStatusGroup.author.username) {
+                    setShowStatusModal(false);
+                    router.push(`/${selectedStatusGroup.author.username}`);
+                  }
+                }}
+              >
                 <Image
                   src={selectedStatusGroup.author.avatar}
                   alt={selectedStatusGroup.author.name}
@@ -817,7 +829,7 @@ export default function StatusPage() {
 
             {/* Content */}
             <div className="p-4 cursor-pointer" onClick={toggleControls}>
-              <p className="text-black mb-4">{getCurrentStatus()!.content}</p>
+              <p className="text-black mb-4 whitespace-pre-wrap">{getCurrentStatus()!.content}</p>
 
               {/* Like and Share */}
               <div className="flex items-center gap-6 mb-4" onClick={(e) => e.stopPropagation()}>

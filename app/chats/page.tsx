@@ -80,11 +80,269 @@ interface Broadcast {
   createdAt: string;
 }
 
+// Profile cache outside component to persist across renders
+const profileCache = new Map<string, any>();
+const linkPreviewCache = new Map<string, any>();
+
+// Component for external link previews
+const ExternalLinkPreview = ({ url, theme }: { url: string; theme: string }) => {
+  const [preview, setPreview] = useState<any>(() => linkPreviewCache.get(url) || null);
+  const [loading, setLoading] = useState(!linkPreviewCache.has(url));
+
+  useEffect(() => {
+    // Check if cached preview has invalid images, if so refetch
+    const cachedPreview = linkPreviewCache.get(url);
+    const hasInvalidCachedImage = cachedPreview?.image?.startsWith('data:;base64,');
+
+    if (linkPreviewCache.has(url) && !hasInvalidCachedImage) {
+      return;
+    }
+
+    const fetchPreview = async () => {
+      try {
+        const response = await api.get(`/chat/link-preview?url=${encodeURIComponent(url)}`);
+        if (response.data && !response.data.error) {
+          linkPreviewCache.set(url, response.data);
+          setPreview(response.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch link preview:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPreview();
+  }, [url]);
+
+  if (loading) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`block mt-2 rounded-lg overflow-hidden border ${
+          theme === 'light'
+            ? 'border-gray-300 bg-gray-50'
+            : 'border-white/20 bg-white/5'
+        } animate-pulse`}
+      >
+        <div className={`h-40 ${theme === 'light' ? 'bg-gray-200' : 'bg-white/10'}`} />
+        <div className="p-3 space-y-2">
+          <div className={`h-3 rounded ${theme === 'light' ? 'bg-gray-200' : 'bg-white/10'}`} style={{ width: '60%' }} />
+          <div className={`h-4 rounded ${theme === 'light' ? 'bg-gray-200' : 'bg-white/10'}`} style={{ width: '90%' }} />
+        </div>
+      </a>
+    );
+  }
+
+  if (!preview || preview.error) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`inline-flex items-center gap-1 underline hover:opacity-80 break-all ${
+          theme === 'light' ? 'text-blue-600' : 'text-blue-400'
+        }`}
+      >
+        {url}
+        <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+        </svg>
+      </a>
+    );
+  }
+
+  const hostname = new URL(url).hostname;
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`block mt-2 rounded-lg overflow-hidden border hover:opacity-90 transition ${
+        theme === 'light'
+          ? 'border-gray-200 bg-gray-50'
+          : 'border-white/20 bg-white/5'
+      }`}
+    >
+      {preview.image && (
+        <div className="w-full h-40 overflow-hidden bg-gray-200">
+          <img
+            src={preview.image}
+            alt={preview.title || 'Link preview'}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+        </div>
+      )}
+      <div className="p-3">
+        <div className="flex items-start gap-2">
+          <div className="w-4 h-4 mt-0.5 flex-shrink-0">
+            {preview.favicon ? (
+              <img
+                src={preview.favicon}
+                alt=""
+                className="w-4 h-4"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            ) : (
+              <svg className={`w-4 h-4 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+              </svg>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            {preview.siteName && (
+              <p className={`text-xs mb-1 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
+                {preview.siteName}
+              </p>
+            )}
+            {preview.title && (
+              <p className={`text-sm font-semibold mb-1 line-clamp-2 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+                {preview.title}
+              </p>
+            )}
+            {preview.description && (
+              <p className={`text-xs line-clamp-2 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
+                {preview.description}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </a>
+  );
+};
+
+// Component to fetch and display Tarpai profile link preview - moved outside to prevent recreation
+const TarpaiLinkPreview = ({ username, url, theme }: { username: string; url: string; theme: string }) => {
+  const [profileData, setProfileData] = useState<any>(() => profileCache.get(username) || null);
+  const [loading, setLoading] = useState(!profileCache.has(username));
+
+  useEffect(() => {
+    // If we have cached data, don't fetch again
+    if (profileCache.has(username)) {
+      return;
+    }
+
+    const fetchProfile = async () => {
+      try {
+        const response = await api.get(`/users/search?query=${username}`);
+        const user = response.data.find((u: any) => u.username === username);
+        if (user) {
+          profileCache.set(username, user); // Cache the result
+          setProfileData(user);
+        }
+      } catch (error) {
+        console.error('Failed to fetch profile:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [username]);
+
+  if (loading) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`block mt-2 rounded-lg overflow-hidden border ${
+          theme === 'light'
+            ? 'border-gray-300 bg-gray-50'
+            : 'border-white/20 bg-white/5'
+        } animate-pulse`}
+      >
+        <div className={`h-40 ${theme === 'light' ? 'bg-gray-200' : 'bg-white/10'}`} />
+        <div className="p-3 space-y-2">
+          <div className={`h-3 rounded ${theme === 'light' ? 'bg-gray-200' : 'bg-white/10'}`} style={{ width: '60%' }} />
+          <div className={`h-4 rounded ${theme === 'light' ? 'bg-gray-200' : 'bg-white/10'}`} style={{ width: '90%' }} />
+        </div>
+      </a>
+    );
+  }
+
+  if (!profileData) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`inline-flex items-center gap-1 underline hover:opacity-80 ${
+          theme === 'light' ? 'text-blue-600' : 'text-blue-400'
+        }`}
+      >
+        @{username}
+        <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+        </svg>
+      </a>
+    );
+  }
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`block mt-2 rounded-lg overflow-hidden border hover:opacity-90 transition ${
+        theme === 'light'
+          ? 'border-gray-200 bg-gray-50'
+          : 'border-white/20 bg-white/5'
+      }`}
+    >
+      {/* Avatar Banner */}
+      <div className="relative h-40 bg-gradient-to-br from-pink-500 to-purple-600">
+        <Image
+          src={profileData.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
+          alt={profileData.name}
+          fill
+          className="object-cover"
+        />
+      </div>
+
+      {/* Profile Info */}
+      <div className="p-3">
+        <div className="flex items-start gap-2">
+          <div className="w-4 h-4 mt-0.5 flex-shrink-0">
+            <svg className={`w-4 h-4 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className={`text-xs mb-1 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
+              tarpai.onrender.com
+            </p>
+            <p className={`text-sm font-semibold mb-1 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+              {profileData.displayName || profileData.name}
+            </p>
+            {profileData.bio && (
+              <p className={`text-xs line-clamp-2 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
+                {profileData.bio}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </a>
+  );
+};
+
 export default function ChatsPage() {
   const router = useRouter();
   const currentUser = useAuthStore((state) => state.user);
   const { background } = useBackground();
   const { theme } = useTheme();
+  
+  console.log('🔄 ChatsPage RENDER');
   
   // Read tab from URL parameter, default to 'chats'
   const getInitialTab = (): 'chats' | 'channels' | 'broadcasts' => {
@@ -101,6 +359,21 @@ export default function ChatsPage() {
   const [activeTab, setActiveTab] = useState<'chats' | 'channels' | 'broadcasts'>(getInitialTab());
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Watch for URL changes to update active tab
+  useEffect(() => {
+    const checkUrlTab = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tab = urlParams.get('tab');
+      if (tab === 'channels' || tab === 'broadcasts') {
+        setActiveTab(tab);
+      } else if (!tab) {
+        setActiveTab('chats');
+      }
+    };
+    
+    checkUrlTab();
+  }, []);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [followers, setFollowers] = useState<Follower[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -122,13 +395,15 @@ export default function ChatsPage() {
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
   const [mainSearchQuery, setMainSearchQuery] = useState('');
+  const [broadcastCount, setBroadcastCount] = useState(0);
+  const [maxBroadcasts] = useState(2);
+
+  // Debug broadcasts state changes
+  useEffect(() => {
+    console.log('📊 Broadcasts state changed - Received:', receivedBroadcasts.length, 'Sent:', sentBroadcasts.length);
+  }, [receivedBroadcasts, sentBroadcasts]);
 
   useEffect(() => {
-    // Reload page on focus (when returning from chat page)
-    const handleFocusReload = () => {
-      window.location.reload();
-    };
-
     // Handle URL parameter changes for tab switching
     const handleUrlChange = () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -140,11 +415,12 @@ export default function ChatsPage() {
       }
     };
 
-    window.addEventListener('focus', handleFocusReload);
+    // Check URL on mount in case we navigated here with a tab parameter
+    handleUrlChange();
+
     window.addEventListener('popstate', handleUrlChange);
 
     return () => {
-      window.removeEventListener('focus', handleFocusReload);
       window.removeEventListener('popstate', handleUrlChange);
     };
   }, []);
@@ -290,6 +566,7 @@ export default function ChatsPage() {
   };
 
   const fetchBroadcasts = async () => {
+    console.log('📡 fetchBroadcasts called');
     setBroadcastsLoading(true);
     try {
       // Fetch both received and sent broadcasts
@@ -298,6 +575,7 @@ export default function ChatsPage() {
         api.get('/broadcasts')
       ]);
       
+      console.log('📨 Broadcasts fetched - Received:', receivedResponse.data.broadcasts?.length, 'Sent:', sentResponse.data.broadcasts?.length);
       setReceivedBroadcasts(receivedResponse.data.broadcasts || []);
       setSentBroadcasts(sentResponse.data.broadcasts || []);
     } catch (error) {
@@ -308,18 +586,38 @@ export default function ChatsPage() {
     }
   };
 
+  const fetchBroadcastCount = async () => {
+    try {
+      const response = await api.get('/users/broadcast-count');
+      setBroadcastCount(response.data.yearlyBroadcastCount || 0);
+    } catch (error) {
+      console.error('Failed to fetch broadcast count:', error);
+    }
+  };
+
   const handleSendBroadcast = async () => {
     if (!broadcastMessage.trim()) {
       toast.error('Please enter a message');
       return;
     }
 
+    // Check if user has reached broadcast limit
+    if (broadcastCount >= maxBroadcasts) {
+      toast.error('You have reached your yearly broadcast limit of 2');
+      return;
+    }
+
     setSendingBroadcast(true);
     try {
-      await api.post('/broadcasts', {
+      const response = await api.post('/broadcasts', {
         message: broadcastMessage,
         recipientType: 'followers',
       });
+
+      // Update broadcast count from response
+      if (response.data.yearlyBroadcastCount !== undefined) {
+        setBroadcastCount(response.data.yearlyBroadcastCount);
+      }
 
       toast.success('Broadcast sent successfully!');
       setBroadcastMessage('');
@@ -460,6 +758,7 @@ export default function ChatsPage() {
       fetchChannels();
     } else if (activeTab === 'broadcasts') {
       fetchBroadcasts();
+      fetchBroadcastCount();
     }
   }, [activeTab]);
 
@@ -468,6 +767,37 @@ export default function ChatsPage() {
     follower.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     follower.username?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Helper function to detect and render links in broadcast messages
+  const renderBroadcastMessage = (message: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = message.split(urlRegex);
+    
+    return parts.map((part, index) => {
+      if (part.match(urlRegex)) {
+        // Extract username from tarpai URLs
+        const tarpaiMatch = part.match(/https?:\/\/(?:www\.)?tarpai\.onrender\.com\/([a-zA-Z0-9_-]+)/);
+        
+        if (tarpaiMatch) {
+          const username = tarpaiMatch[1];
+          return (
+            <TarpaiLinkPreview 
+              key={`${username}-${index}`} 
+              username={username} 
+              url={part} 
+              theme={theme}
+            />
+          );
+        }
+        
+        // For other URLs, show rich link preview
+        return <ExternalLinkPreview key={`link-${index}`} url={part} theme={theme} />;
+      }
+      
+      // Regular text
+      return part ? <span key={index}>{part}</span> : null;
+    }).filter(Boolean); // Remove null values
+  };
 
   // Helper function to format time
   const formatMessageTime = (dateString: string) => {
@@ -926,7 +1256,7 @@ export default function ChatsPage() {
                 <div className="flex justify-center py-20">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
                 </div>
-              ) : sentBroadcasts.length === 0 && receivedBroadcasts.length === 0 ? (
+              ) : sentBroadcasts.length === 0 && receivedBroadcasts.filter(b => b.sender && b.sender._id && b.sender.name).length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20">
                   <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mb-4">
                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -963,7 +1293,9 @@ export default function ChatsPage() {
                                 {new Date(broadcast.createdAt).toLocaleDateString()}
                               </span>
                             </div>
-                            <p className={`leading-relaxed mb-3 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>{broadcast.message}</p>
+                            <div className={`leading-relaxed mb-3 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+                              {renderBroadcastMessage(broadcast.message)}
+                            </div>
                             <div className="flex justify-end">
                               <span className="text-xs text-blue-400 font-medium flex items-center gap-1">
                                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -979,12 +1311,18 @@ export default function ChatsPage() {
                   )}
 
                   {/* Received Broadcasts Section */}
-                  {receivedBroadcasts.length > 0 && (
+                  {receivedBroadcasts.filter(b => b.sender && b.sender._id && b.sender.name).length > 0 && (
                     <div>
                       <h3 className={`text-lg font-semibold mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>RECEIVED</h3>
                       <div className="space-y-3">
                         {receivedBroadcasts
                           .filter(broadcast => {
+                            // Filter out broadcasts from unknown users (missing sender data)
+                            if (!broadcast.sender || !broadcast.sender._id || !broadcast.sender.name) {
+                              return false;
+                            }
+                            
+                            // Apply search filter
                             if (!mainSearchQuery.trim()) return true;
                             const searchLower = mainSearchQuery.toLowerCase();
                             return (
@@ -1025,7 +1363,9 @@ export default function ChatsPage() {
                                 )}
                               </div>
                             </div>
-                            <p className={`leading-relaxed ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>{broadcast.message}</p>
+                            <div className={`leading-relaxed ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+                              {renderBroadcastMessage(broadcast.message)}
+                            </div>
                             <div className="mt-3 flex justify-end">
                               <span className={`text-xs font-medium flex items-center gap-1 ${
                                 theme === 'light' ? 'text-green-700' : 'text-green-400'
@@ -1175,17 +1515,23 @@ export default function ChatsPage() {
           >
             {/* Header */}
             <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setShowBroadcastModal(false)}
-                  className="text-gray-600 hover:text-gray-900"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                <h2 className="text-xl font-bold text-black">New Broadcast</h2>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => setShowBroadcastModal(false)}
+                    className="text-gray-600 hover:text-gray-900"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <h2 className="text-xl font-bold text-black">New Broadcast</h2>
+                </div>
+                <span className="text-sm font-semibold text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                  {broadcastCount}/{maxBroadcasts}
+                </span>
               </div>
+              <p className="text-sm text-red-600 font-medium ml-10">2 broadcasts per year</p>
             </div>
 
             {/* To Field */}
@@ -1204,7 +1550,7 @@ export default function ChatsPage() {
                 value={broadcastMessage}
                 onChange={(e) => setBroadcastMessage(e.target.value)}
                 maxLength={500}
-                placeholder="What's on your mind? This message will be sent to all your followers."
+                placeholder="What's on your mind? This message will be sent to all your followers.&#10;&#10;⚠️ You can only send 2 broadcasts per year. Be careful what you broadcast!"
                 className="w-full h-full min-h-[300px] text-black placeholder-gray-400 bg-transparent focus:outline-none resize-none text-lg"
               />
             </div>
@@ -1219,13 +1565,13 @@ export default function ChatsPage() {
               
               <button
                 onClick={handleSendBroadcast}
-                disabled={sendingBroadcast || !broadcastMessage.trim()}
+                disabled={sendingBroadcast || !broadcastMessage.trim() || broadcastCount >= maxBroadcasts}
                 className="w-full bg-gray-800 text-white hover:bg-gray-700 py-4 rounded-2xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
-                {sendingBroadcast ? 'Sending...' : 'Send Broadcast'}
+                {sendingBroadcast ? 'Sending...' : `Send Broadcast (${broadcastCount}/${maxBroadcasts})`}
               </button>
               
               <p className="text-xs text-gray-500 text-center mt-3">

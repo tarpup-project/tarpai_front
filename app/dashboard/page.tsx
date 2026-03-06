@@ -49,6 +49,8 @@ export default function DashboardPage() {
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
   const [selectedFollowers, setSelectedFollowers] = useState<string[]>([]);
+  const [broadcastCount, setBroadcastCount] = useState(0);
+  const [maxBroadcasts] = useState(2);
   
   // Search for friends state
   const [followingModalTab, setFollowingModalTab] = useState<'following' | 'search'>('following');
@@ -93,8 +95,18 @@ export default function DashboardPage() {
     
     if (user) {
       fetchUserData();
+      fetchBroadcastCount();
     }
   }, [user, isHydrated, isCheckingAuth]);
+
+  const fetchBroadcastCount = async () => {
+    try {
+      const response = await api.get('/users/broadcast-count');
+      setBroadcastCount(response.data.yearlyBroadcastCount || 0);
+    } catch (error) {
+      console.error('Failed to fetch broadcast count:', error);
+    }
+  };
 
   const fetchUserData = async () => {
     try {
@@ -376,20 +388,32 @@ export default function DashboardPage() {
       return;
     }
 
+    // Check if user has reached broadcast limit
+    if (broadcastCount >= maxBroadcasts) {
+      toast.error('You have reached your yearly broadcast limit of 2');
+      return;
+    }
+
     setSendingBroadcast(true);
     try {
+      let response;
       if (selectedFollowers.length > 0) {
         // Send to selected followers
-        await api.post('/broadcasts/selected', {
+        response = await api.post('/broadcasts/selected', {
           message: broadcastMessage,
           userIds: selectedFollowers,
         });
       } else {
         // Send to all followers
-        await api.post('/broadcasts', {
+        response = await api.post('/broadcasts', {
           message: broadcastMessage,
           recipientType: 'followers',
         });
+      }
+
+      // Update broadcast count from response
+      if (response.data.yearlyBroadcastCount !== undefined) {
+        setBroadcastCount(response.data.yearlyBroadcastCount);
       }
 
       toast.success('Broadcast sent successfully!');
@@ -1318,17 +1342,23 @@ export default function DashboardPage() {
           >
             {/* Header */}
             <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setShowBroadcastModal(false)}
-                  className="text-gray-600 hover:text-gray-900"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                <h2 className="text-xl font-bold text-black">New Broadcast</h2>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => setShowBroadcastModal(false)}
+                    className="text-gray-600 hover:text-gray-900"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <h2 className="text-xl font-bold text-black">New Broadcast</h2>
+                </div>
+                <span className="text-sm font-semibold text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                  {broadcastCount}/{maxBroadcasts}
+                </span>
               </div>
+              <p className="text-sm text-red-600 font-medium ml-10">2 broadcasts per year</p>
             </div>
 
             {/* To Field */}
@@ -1350,7 +1380,7 @@ export default function DashboardPage() {
                 value={broadcastMessage}
                 onChange={(e) => setBroadcastMessage(e.target.value)}
                 maxLength={500}
-                placeholder="What's on your mind? This message will be sent to all your followers."
+                placeholder="What's on your mind? This message will be sent to all your followers.&#10;&#10;⚠️ You can only send 2 broadcasts per year. Be careful what you broadcast!"
                 className="w-full h-full min-h-[300px] text-black placeholder-gray-400 bg-transparent focus:outline-none resize-none text-lg"
               />
             </div>
@@ -1365,16 +1395,16 @@ export default function DashboardPage() {
               
               <button
                 onClick={handleSendBroadcast}
-                disabled={sendingBroadcast || !broadcastMessage.trim()}
+                disabled={sendingBroadcast || !broadcastMessage.trim() || broadcastCount >= maxBroadcasts}
                 className="w-full bg-gray-600 text-white hover:bg-gray-700 py-4 rounded-2xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
-                {sendingBroadcast ? 'Sending...' : 'Send Broadcast'}
+                {sendingBroadcast ? 'Sending...' : `Send Broadcast (${broadcastCount}/${maxBroadcasts})`}
               </button>
               
-              <p className="text-xs text-gray-500 text-center mt-3">
+              <p className="text-xs text-gray-400 text-center mt-3">
                 Followers will receive a notification. Replies are disabled.
               </p>
             </div>

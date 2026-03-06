@@ -123,7 +123,9 @@ export default function AppHeader() {
       setShowNotificationsModal(false);
 
       // Navigate based on notification type
-      if (notification.type === 'chat_message' && notification.sender?._id) {
+      if (notification.type === 'broadcast') {
+        router.push('/chats?tab=broadcasts');
+      } else if (notification.type === 'chat_message' && notification.sender?._id) {
         window.location.href = `/chat/${notification.sender._id}`;
       } else if ((notification.type === 'new_follower' || notification.type === 'follow') && notification.sender) {
         const username = notification.sender.username || notification.sender._id;

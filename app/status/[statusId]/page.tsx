@@ -212,29 +212,32 @@ export default function StatusDetailPage() {
     >
       <AppHeader />
 
-      <div className="flex items-center justify-center px-4 py-6 pb-24 min-h-screen">
+      <div className="pb-24">
         {/* Status Card */}
-        <div className="bg-white rounded-3xl overflow-hidden shadow-lg inline-block max-w-2xl">
+        <div className="bg-white mb-4">
           {/* Author Info */}
-          <div className="p-4 flex items-center gap-3">
-            <Image
-              src={status.author.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
-              alt={status.author.name}
-              width={48}
-              height={48}
-              className="w-12 h-12 rounded-full object-cover"
+          <div className="p-4 flex items-center gap-3 border-b border-gray-200">
+            <div 
+              className="flex items-center gap-3 flex-1 cursor-pointer hover:opacity-80 transition"
               onClick={() => {
                 if (status.author.username) {
                   router.push(`/${status.author.username}`);
                 }
               }}
-              style={{ cursor: status.author.username ? 'pointer' : 'default' }}
-            />
-            <div className="flex-1">
-              <h3 className="font-semibold text-black">{status.author.name}</h3>
-              {status.author.username && (
-                <p className="text-sm text-gray-500">@{status.author.username}</p>
-              )}
+            >
+              <Image
+                src={status.author.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
+                alt={status.author.name}
+                width={48}
+                height={48}
+                className="w-12 h-12 rounded-full object-cover"
+              />
+              <div>
+                <h3 className="font-semibold text-black">{status.author.name}</h3>
+                {status.author.username && (
+                  <p className="text-sm text-gray-500">@{status.author.username}</p>
+                )}
+              </div>
             </div>
             <button
               onClick={() => router.back()}
@@ -248,16 +251,16 @@ export default function StatusDetailPage() {
 
           {/* Status Images */}
           {status.images && status.images.length > 0 && (
-            <div className="overflow-y-auto snap-y snap-mandatory max-h-[70vh]">
+            <div className="w-full">
               {status.images.map((image, index) => (
-                <div key={index} className="relative snap-start">
+                <div key={index} className="w-full">
                   <Image
                     src={image}
                     alt={`Status image ${index + 1}`}
-                    width={800}
-                    height={800}
-                    className="w-auto h-auto max-w-full"
-                    style={{ objectFit: 'contain' }}
+                    width={1200}
+                    height={1200}
+                    className="w-full h-auto object-contain"
+                    style={{ maxHeight: '80vh' }}
                   />
                 </div>
               ))}
@@ -266,7 +269,7 @@ export default function StatusDetailPage() {
 
           {/* Status Content */}
           <div className="p-4">
-            <p className="text-black mb-4">{status.content}</p>
+            <p className="text-black mb-4 whitespace-pre-wrap">{status.content}</p>
 
             {/* Like and Share */}
             <div className="flex items-center gap-6 mb-4">
@@ -313,6 +316,16 @@ export default function StatusDetailPage() {
 
       {/* Bottom Navigation or Login Button */}
       <BottomNav />
+
+      {/* Floating Home Button */}
+      <button
+        onClick={() => router.push('/dashboard')}
+        className="fixed bottom-24 right-6 w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition z-20"
+      >
+        <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        </svg>
+      </button>
     </div>
   );
 }
