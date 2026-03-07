@@ -124,6 +124,8 @@ export default function StatusPage() {
   const fetchStatuses = async () => {
     try {
       const response = await api.get('/status/feed');
+      console.log('Raw statuses from API:', response.data);
+      
       // Group statuses by author
       const grouped = response.data.reduce((acc: any, status: Status) => {
         const authorId = status.author._id;
@@ -151,6 +153,7 @@ export default function StatusPage() {
         return new Date(b.latestTime).getTime() - new Date(a.latestTime).getTime();
       }) as GroupedStatus[];
       
+      console.log('Grouped statuses:', groupedArray);
       setStatuses(groupedArray);
     } catch (error) {
       console.error('Failed to fetch statuses:', error);
@@ -558,9 +561,9 @@ export default function StatusPage() {
           )}
         </div>
 
-        {/* Status Feed - WhatsApp Style Grouped */}
+        {/* Status Feed - Grid Layout */}
         <div className="flex-1 px-2 pb-32 overflow-y-auto">
-          <div className="columns-2 gap-3 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
             {statuses.map((group) => {
               const firstStatus = group.statuses[0];
               const statusCount = group.statuses.length;
@@ -570,7 +573,7 @@ export default function StatusPage() {
                 <div
                   key={group.author._id}
                   onClick={() => handleStatusGroupClick(group)}
-                  className={`break-inside-avoid mb-3 ${theme === 'light' ? 'bg-white/40' : 'bg-white/10 border border-white/30'} backdrop-blur-md rounded-2xl overflow-hidden relative cursor-pointer hover:scale-[1.02] transition`}
+                  className={`flex flex-col ${theme === 'light' ? 'bg-white/40' : 'bg-white/10 border border-white/30'} backdrop-blur-md rounded-2xl overflow-hidden relative cursor-pointer hover:scale-[1.02] transition`}
                 >
                   {/* First Status Image - Only show if image exists */}
                   {hasImage && (
@@ -595,8 +598,8 @@ export default function StatusPage() {
                     </div>
                   )}
 
-                  {/* Author Info */}
-                  <div className="p-3">
+                  {/* Content and Author Info - Flex grow to push author to bottom */}
+                  <div className="flex flex-col flex-1 p-3">
                     {/* Show count badge for text-only statuses */}
                     {!hasImage && statusCount > 1 && (
                       <div className="flex justify-end mb-2">
@@ -609,11 +612,13 @@ export default function StatusPage() {
                       </div>
                     )}
                     
+                    {/* Content - grows to fill space */}
                     {firstStatus.content && (
-                      <p className="text-sm mb-2 line-clamp-2 whitespace-pre-wrap">{firstStatus.content}</p>
+                      <p className="text-sm mb-2 line-clamp-2 whitespace-pre-wrap flex-1">{firstStatus.content}</p>
                     )}
                     
-                    <div className="flex items-center gap-2">
+                    {/* Author Info - stays at bottom */}
+                    <div className="flex items-center gap-2 mt-auto">
                       <Image
                         src={group.author.avatar}
                         alt={group.author.name}
