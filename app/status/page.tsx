@@ -26,6 +26,15 @@ interface Status {
   };
   createdAt: string;
   isLiked: boolean;
+  isReposted?: boolean;
+  linkPreview?: {
+    url: string;
+    title?: string;
+    description?: string;
+    image?: string;
+    favicon?: string;
+    siteName?: string;
+  };
 }
 
 interface GroupedStatus {
@@ -85,6 +94,32 @@ export default function StatusPage() {
       fetchStatuses();
     }
   }, [user, isCheckingAuth]);
+
+  // Helper function to render text with clickable links
+  const renderTextWithLinks = (text: string) => {
+    if (!text) return text;
+    
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    
+    return parts.map((part, index) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-black underline hover:text-gray-700 font-bold text-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  };
 
   const fetchStatuses = async () => {
     try {
@@ -829,56 +864,134 @@ export default function StatusPage() {
 
             {/* Content */}
             <div className="p-4 cursor-pointer" onClick={toggleControls}>
-              <p className="text-black mb-4 whitespace-pre-wrap">{getCurrentStatus()!.content}</p>
+              {(() => {
+                const currentStatus = getCurrentStatus();
+                if (!currentStatus) return null;
+                
+                return (
+                  <>
+                    <p className="text-black mb-4 whitespace-pre-wrap">
+                      {renderTextWithLinks(currentStatus.content)}
+                    </p>
 
-              {/* Like and Share */}
-              <div className="flex items-center gap-6 mb-4" onClick={(e) => e.stopPropagation()}>
-                <button
-                  onClick={() => handleLike(getCurrentStatus()!.id)}
-                  className="flex items-center gap-2"
-                >
-                  <svg 
-                    className={`w-6 h-6 ${getCurrentStatus()!.isLiked ? 'fill-red-500 text-red-500' : 'fill-none text-gray-600'}`}
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                  </svg>
-                  <span className="text-black font-medium">{getCurrentStatus()!.likesCount}</span>
-                </button>
-                <button
-                  onClick={() => handleShare(getCurrentStatus()!)}
-                  className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                  </svg>
-                </button>
-              </div>
+                    {/* Link Preview Card - Only show if no images */}
+                    {currentStatus.linkPreview && (!currentStatus.images || currentStatus.images.length === 0) && (
+                      <a
+                        href={currentStatus.linkPreview.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="block rounded-lg overflow-hidden border border-gray-200 bg-gray-50 hover:opacity-90 transition mb-4"
+                      >
+                        {currentStatus.linkPreview.image && currentStatus.linkPreview.image.trim() !== '' && (
+                          <div className="w-full h-48 overflow-hidden bg-gray-200">
+                            <Image
+                              src={currentStatus.linkPreview.image}
+                              alt={currentStatus.linkPreview.title || 'Link preview'}
+                              width={400}
+                              height={200}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        )}
+                        <div className="p-3">
+                          <div className="flex items-start gap-2">
+                            <div className="w-4 h-4 mt-0.5 flex-shrink-0">
+                              {currentStatus.linkPreview.favicon && currentStatus.linkPreview.favicon.trim() !== '' ? (
+                                <Image
+                                  src={currentStatus.linkPreview.favicon}
+                                  alt="favicon"
+                                  width={16}
+                                  height={16}
+                                  className="w-4 h-4"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                </svg>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              {currentStatus.linkPreview.siteName && (
+                                <p className="text-xs mb-1 text-gray-600">
+                                  {currentStatus.linkPreview.siteName}
+                                </p>
+                              )}
+                              {currentStatus.linkPreview.title && (
+                                <p className="text-sm font-semibold mb-1 line-clamp-2 text-gray-900">
+                                  {currentStatus.linkPreview.title}
+                                </p>
+                              )}
+                              {currentStatus.linkPreview.description && (
+                                <p className="text-xs line-clamp-2 text-gray-600">
+                                  {currentStatus.linkPreview.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </a>
+                    )}
 
-              {/* Repost Buttons - Only show if not the author */}
-              {getCurrentStatus()!.author._id !== user?.id && (
-                <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={handleRepostNow}
-                    className="w-full bg-black text-white py-3 rounded-2xl font-semibold hover:bg-gray-800 transition flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Repost Now
-                  </button>
-                  <button
-                    onClick={handleEditRepost}
-                    className="w-full bg-white text-black border-2 border-gray-300 py-3 rounded-2xl font-semibold hover:bg-gray-50 transition flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                    Edit & Repost
-                  </button>
-                </div>
-              )}
+                    {/* Like and Share */}
+                    <div className="flex items-center gap-6 mb-4" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => handleLike(currentStatus.id)}
+                        className="flex items-center gap-2"
+                      >
+                        <svg 
+                          className={`w-6 h-6 ${currentStatus.isLiked ? 'fill-red-500 text-red-500' : 'fill-none text-gray-600'}`}
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                        </svg>
+                        <span className="text-black font-medium">{currentStatus.likesCount}</span>
+                      </button>
+                      <button
+                        onClick={() => handleShare(currentStatus)}
+                        className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition"
+                      >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    {/* Repost Buttons - Only show if not the author and not already reposted */}
+                    {currentStatus.author._id !== user?.id && !currentStatus.isReposted && (
+                      <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={handleRepostNow}
+                          className="w-full bg-black text-white py-3 rounded-2xl font-semibold hover:bg-gray-800 transition flex items-center justify-center gap-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          Repost Now
+                        </button>
+                        <button
+                          onClick={handleEditRepost}
+                          className="w-full bg-white text-black border-2 border-gray-300 py-3 rounded-2xl font-semibold hover:bg-gray-50 transition flex items-center justify-center gap-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Edit & Repost
+                        </button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>

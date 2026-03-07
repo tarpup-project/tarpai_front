@@ -27,6 +27,7 @@ export default function TarpAIPage() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [showCalendarPermissionModal, setShowCalendarPermissionModal] = useState(false);
+  const [showToolsDropdown, setShowToolsDropdown] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,19 +41,8 @@ export default function TarpAIPage() {
       // Token exists, wait for store to hydrate
       setIsCheckingAuth(false);
       loadConversationHistory();
-      checkCalendarPermission();
     }
   }, [router]);
-
-  const checkCalendarPermission = () => {
-    const hasCalendarPermission = localStorage.getItem('calendarPermissionGranted');
-    if (!hasCalendarPermission) {
-      // Show modal after a short delay for better UX
-      setTimeout(() => {
-        setShowCalendarPermissionModal(true);
-      }, 1000);
-    }
-  };
 
   const handleGrantCalendarPermission = () => {
     // Build Google OAuth URL for calendar access using separate calendar client
@@ -254,12 +244,56 @@ export default function TarpAIPage() {
               <div className={`text-6xl mb-4 ${theme === 'light' ? 'opacity-50' : 'opacity-30'}`}>
                 🤖
               </div>
-              <h2 className={`text-xl font-semibold mb-2 ${theme === 'light' ? 'text-black' : 'text-white'}`}>
+              <h2 className={`text-xl font-semibold mb-2 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
                 Welcome to TarpAI!
               </h2>
-              <p className={`text-sm ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
+              <p className={`text-sm mb-6 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
                 I can help you manage appointments, schedule meetings, and answer your questions.
               </p>
+              
+              {/* Action Buttons */}
+              <div className="flex gap-3 w-full max-w-md">
+                <button
+                  onClick={() => {
+                    setInputMessage('Create a task schedule for me');
+                    // Optionally auto-send the message
+                    // handleSendMessage();
+                  }}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl font-medium transition ${
+                    theme === 'light'
+                      ? 'bg-white text-gray-600 shadow-md hover:shadow-lg'
+                      : 'bg-white/10 backdrop-blur-md text-gray-400 border border-white/20 hover:bg-white/20'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                  </svg>
+                  <span className="text-sm">Task Schedule</span>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    const hasCalendarPermission = localStorage.getItem('calendarPermissionGranted');
+                    if (hasCalendarPermission) {
+                      setInputMessage('Set an appointment for me');
+                      // Optionally auto-send the message
+                      // handleSendMessage();
+                    } else {
+                      setShowCalendarPermissionModal(true);
+                    }
+                  }}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl font-medium transition ${
+                    theme === 'light'
+                      ? 'bg-white text-gray-600 shadow-md hover:shadow-lg'
+                      : 'bg-white/10 backdrop-blur-md text-gray-400 border border-white/20 hover:bg-white/20'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-sm">{localStorage.getItem('calendarPermissionGranted') ? 'Set Appointment' : 'Add Calendar'}</span>
+                </button>
+              </div>
             </div>
           ) : (
             messages.map((message, index) => (
@@ -334,6 +368,80 @@ export default function TarpAIPage() {
                 : 'bg-black/60 backdrop-blur-md'
             }`}
           >
+            {/* Tool Icon with Dropdown - Only show when there are messages */}
+            {messages.length > 0 && (
+              <div className="relative flex-shrink-0">
+                <button
+                  onClick={() => setShowToolsDropdown(!showToolsDropdown)}
+                  className={`p-2 rounded-full transition ${
+                    theme === 'light'
+                      ? 'hover:bg-gray-100 text-gray-600'
+                      : 'hover:bg-gray-700 text-gray-400'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                  </svg>
+                </button>
+
+                {/* Dropdown Menu */}
+                {showToolsDropdown && (
+                  <div
+                    className={`absolute bottom-full left-0 mb-2 w-48 rounded-2xl shadow-lg overflow-hidden ${
+                      theme === 'light' ? 'bg-white' : 'bg-gray-800'
+                    }`}
+                  >
+                    <button
+                      onClick={() => {
+                        const hasCalendarPermission = localStorage.getItem('calendarPermissionGranted');
+                        if (!hasCalendarPermission) {
+                          setShowCalendarPermissionModal(true);
+                        } else {
+                          setInputMessage('Show my calendar events');
+                        }
+                        setShowToolsDropdown(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 transition ${
+                        theme === 'light'
+                          ? 'hover:bg-gray-100 text-gray-700'
+                          : 'hover:bg-gray-700 text-gray-300'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span className="text-sm">
+                        {localStorage.getItem('calendarPermissionGranted') ? 'Calendar Events' : 'Add Calendar'}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        const hasCalendarPermission = localStorage.getItem('calendarPermissionGranted');
+                        if (hasCalendarPermission) {
+                          setInputMessage('Set an appointment for me');
+                        } else {
+                          toast.error('Please connect your calendar first');
+                          setShowCalendarPermissionModal(true);
+                        }
+                        setShowToolsDropdown(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 transition ${
+                        theme === 'light'
+                          ? 'hover:bg-gray-100 text-gray-700'
+                          : 'hover:bg-gray-700 text-gray-300'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="text-sm">Set Appointment</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             <textarea
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}

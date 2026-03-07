@@ -993,14 +993,23 @@ export default function ChatPage() {
                   </div>
 
                   <div className="flex items-center gap-3 pt-4">
-                    <input
-                      type="text"
+                    <textarea
                       value={publicUserMessage}
                       onChange={(e) => setPublicUserMessage(e.target.value)}
                       placeholder="What's on your mind?"
-                      className={`flex-1 bg-transparent border-none outline-none text-base ${
+                      rows={1}
+                      className={`flex-1 bg-transparent border-none outline-none text-base resize-none overflow-hidden ${
                         theme === 'light' ? 'text-gray-900 placeholder-gray-500' : 'text-white placeholder-gray-400'
                       }`}
+                      style={{
+                        minHeight: '24px',
+                        maxHeight: '120px',
+                      }}
+                      onInput={(e) => {
+                        const target = e.target as HTMLTextAreaElement;
+                        target.style.height = 'auto';
+                        target.style.height = Math.min(target.scrollHeight, 120) + 'px';
+                      }}
                     />
                     <button
                       onClick={handlePublicChatSubmit}
@@ -1506,14 +1515,22 @@ export default function ChatPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </button>
-            <input
-              type="text"
+            <textarea
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={handleKeyDown}
               placeholder="Type a message..."
               disabled={uploadingImage}
-              className="flex-1 min-w-0 bg-black/50 backdrop-blur-md text-white rounded-full px-5 py-2.5 focus:outline-none focus:ring-2 focus:ring-gray-600 border border-white/10 placeholder-gray-400 disabled:opacity-50"
+              rows={1}
+              className="flex-1 min-w-0 bg-black/50 backdrop-blur-md text-white rounded-full px-5 py-2.5 focus:outline-none focus:ring-2 focus:ring-gray-600 border border-white/10 placeholder-gray-400 disabled:opacity-50 resize-none overflow-hidden"
+              style={{
+                minHeight: '42px',
+                maxHeight: '120px',
+              }}
+              onInput={(e) => {
+                const target = e.target as HTMLTextAreaElement;
+                target.style.height = 'auto';
+                target.style.height = Math.min(target.scrollHeight, 120) + 'px';
+              }}
             />
             <button
               onClick={handleSendMessage}
