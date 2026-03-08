@@ -19,8 +19,9 @@ function VerifyProfileContent() {
     const verifyAndRedirect = async () => {
       const token = searchParams.get('token');
       const profileUserId = searchParams.get('profileUserId');
-      const action = searchParams.get('action') as 'follow' | 'followers' | 'following';
+      const action = searchParams.get('action') as 'follow' | 'followers' | 'following' | 'view_status';
       const profileUsername = searchParams.get('profileUsername');
+      const statusId = searchParams.get('statusId');
 
       if (!token || !profileUserId || !action || !profileUsername) {
         setError('Invalid verification link');
@@ -66,6 +67,9 @@ function VerifyProfileContent() {
           } else if (actionToExecute === 'following') {
             // No API call needed for viewing following - user is now authenticated
             toast.success('Email verified! You can now view following.');
+          } else if (actionToExecute === 'view_status') {
+            // No API call needed for viewing status - user is now authenticated
+            toast.success('Email verified! Redirecting to status...');
           }
         } catch (error) {
           console.error('Failed to execute pending action:', error);
@@ -78,10 +82,14 @@ function VerifyProfileContent() {
           }
         }
 
-        // Redirect back to the profile page with success indicator
+        // Redirect based on action
         const executedAction = pendingAction?.action || action;
         setTimeout(() => {
-          router.push(`/${profileUsername}?verified=true&action=${executedAction}`);
+          if (executedAction === 'view_status' && statusId) {
+            router.push(`/status/${statusId}`);
+          } else {
+            router.push(`/${profileUsername}?verified=true&action=${executedAction}`);
+          }
         }, 3000);
 
       } catch (error: any) {

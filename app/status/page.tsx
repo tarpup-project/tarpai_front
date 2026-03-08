@@ -10,6 +10,7 @@ import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import AppHeader from '@/components/AppHeader';
 import BottomNav from '@/components/BottomNav';
+import ImageCropper from '@/components/ImageCropper';
 
 interface Status {
   id: string;
@@ -75,6 +76,10 @@ export default function StatusPage() {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [showCropper, setShowCropper] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+  const [currentCroppingIndex, setCurrentCroppingIndex] = useState<number | null>(null);
+  const [currentFileToAdd, setCurrentFileToAdd] = useState<File | null>(null);
 
   // Check authentication immediately using localStorage
   useEffect(() => {
@@ -320,26 +325,67 @@ export default function StatusPage() {
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
+    if (!files || files.length === 0) return;
 
-    const newFiles = Array.from(files);
-    const totalImages = selectedImages.length + newFiles.length;
-
-    if (totalImages > 7) {
-      toast.error('You can only upload up to 7 images');
+    // Check if already has an image
+    if (selectedImages.length >= 1) {
+      toast.error('You can only upload 1 image per status');
       return;
     }
 
-    setSelectedImages(prev => [...prev, ...newFiles]);
+    // Only process the first file
+    const file = files[0];
+    setCurrentFileToAdd(file); // Store the original file
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImageToCrop(reader.result as string);
+      setCurrentCroppingIndex(selectedImages.length);
+      setShowCropper(true);
+    };
+    reader.readAsDataURL(file);
 
-    // Create preview URLs
-    newFiles.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreviewUrls(prev => [...prev, reader.result as string]);
-      };
-      reader.readAsDataURL(file);
-    });
+    // Reset input
+    e.target.value = '';
+  };
+
+  const handleCropComplete = (croppedImage: Blob) => {
+    // Convert blob to file
+    const file = new File([croppedImage], `cropped-${Date.now()}.jpg`, { type: 'image/jpeg' });
+    
+    setSelectedImages(prev => [...prev, file]);
+    
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(croppedImage);
+    setImagePreviewUrls(prev => [...prev, previewUrl]);
+    
+    // Close cropper
+    setShowCropper(false);
+    setImageToCrop(null);
+    setCurrentCroppingIndex(null);
+  };
+
+  const handleCropCancel = () => {
+    setShowCropper(false);
+    setImageToCrop(null);
+    setCurrentCroppingIndex(null);
+    setCurrentFileToAdd(null);
+  };
+
+  const handleSkipCrop = () => {
+    // Use the original file without cropping
+    if (currentFileToAdd) {
+      setSelectedImages(prev => [...prev, currentFileToAdd]);
+      
+      // Create preview URL from original file
+      const previewUrl = URL.createObjectURL(currentFileToAdd);
+      setImagePreviewUrls(prev => [...prev, previewUrl]);
+    }
+    
+    // Close cropper
+    setShowCropper(false);
+    setImageToCrop(null);
+    setCurrentCroppingIndex(null);
+    setCurrentFileToAdd(null);
   };
 
   const handleRemoveImage = (index: number) => {
@@ -717,14 +763,13 @@ export default function StatusPage() {
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span className="font-medium">Add Photos</span>
+                <span className="font-medium">Add Photo</span>
                 <input
                   type="file"
                   accept="image/*"
-                  multiple
                   onChange={handleImageSelect}
                   className="hidden"
-                  disabled={selectedImages.length >= 7}
+                  disabled={selectedImages.length >= 1}
                 />
               </label>
 
@@ -1064,6 +1109,17 @@ export default function StatusPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Image Cropper */}
+      {showCropper && imageToCrop && (
+        <ImageCropper
+          image={imageToCrop}
+          onCropComplete={handleCropComplete}
+          onCancel={handleCropCancel}
+          onSkip={handleSkipCrop}
+          aspect={4 / 3}
+        />
       )}
     </div>
   );

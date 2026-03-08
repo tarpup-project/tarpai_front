@@ -189,11 +189,13 @@ export default function StatusDetailPage() {
     try {
       const publicApi = (await import('@/lib/publicApi')).default;
       
-      // Send verification link
+      // Send verification link with status author as the profile user
       await publicApi.post('/auth/create-pending-profile-user', {
         name: signupName,
         email: signupEmail,
+        profileUserId: status?.author._id,
         action: 'view_status',
+        profileUsername: status?.author.username || status?.author.name,
         statusId: statusId,
       });
       
