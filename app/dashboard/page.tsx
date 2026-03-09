@@ -1221,7 +1221,7 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-3">
                           <Image
                             src={user.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
-                            alt={user.name}
+                            alt={user.name || user.username || 'User'}
                             width={48}
                             height={48}
                             className="w-12 h-12 rounded-full object-cover"
