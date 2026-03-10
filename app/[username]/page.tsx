@@ -5,12 +5,12 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useBackground } from '@/hooks/useBackground';
 import { useTheme } from '@/hooks/useTheme';
-import { getLinkIconBgColor } from '@/utils/linkIcons';
 import Image from 'next/image';
 import publicApi from '@/lib/publicApi';
 import toast from 'react-hot-toast';
 import AvatarPreview from '@/components/AvatarPreview';
 import BottomNav from '@/components/BottomNav';
+import LinkIcon from '@/components/LinkIcon';
 
 interface Link {
   _id: string;
@@ -38,6 +38,7 @@ export default function UsernamePage() {
   const params = useParams();
   const username = params.username as string;
   const currentUser = useAuthStore((state) => state.user);
+  const setAuth = useAuthStore((state) => state.setAuth);
   const { background } = useBackground();
   const { theme } = useTheme();
   const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
@@ -313,25 +314,33 @@ export default function UsernamePage() {
   };
 
   const fetchFollowers = async () => {
-    if (!profileUser || !currentUser) return;
+    if (!profileUser) return;
     setFollowersLoading(true);
     try {
-      const { default: api } = await import('@/lib/api');
       const targetUserId = profileUser._id || profileUser.id;
-      const response = await api.get(`/follows/followers/${targetUserId}`);
       
-      // Sort followers to put current user first
-      const followersList = response.data.followers || [];
-      const currentUserId = currentUser.id;
-      const sortedFollowers = followersList.sort((a: any, b: any) => {
-        const aId = a._id || a.id;
-        const bId = b._id || b.id;
-        if (aId === currentUserId) return -1;
-        if (bId === currentUserId) return 1;
-        return 0;
-      });
-      
-      setFollowers(sortedFollowers);
+      // Use publicApi for unauthenticated users, api for authenticated
+      if (currentUser) {
+        const { default: api } = await import('@/lib/api');
+        const response = await api.get(`/follows/followers/${targetUserId}`);
+        
+        // Sort followers to put current user first
+        const followersList = response.data.followers || [];
+        const currentUserId = currentUser.id;
+        const sortedFollowers = followersList.sort((a: any, b: any) => {
+          const aId = a._id || a.id;
+          const bId = b._id || b.id;
+          if (aId === currentUserId) return -1;
+          if (bId === currentUserId) return 1;
+          return 0;
+        });
+        
+        setFollowers(sortedFollowers);
+      } else {
+        // Unauthenticated - use publicApi
+        const response = await publicApi.get(`/follows/followers/${targetUserId}`);
+        setFollowers(response.data.followers || []);
+      }
     } catch (error) {
       console.error('Failed to fetch followers:', error);
       toast.error('Failed to load followers');
@@ -341,25 +350,33 @@ export default function UsernamePage() {
   };
 
   const fetchFollowing = async () => {
-    if (!profileUser || !currentUser) return;
+    if (!profileUser) return;
     setFollowingLoading(true);
     try {
-      const { default: api } = await import('@/lib/api');
       const targetUserId = profileUser._id || profileUser.id;
-      const response = await api.get(`/follows/following/${targetUserId}`);
       
-      // Sort following to put current user first
-      const followingList = response.data.following || [];
-      const currentUserId = currentUser.id;
-      const sortedFollowing = followingList.sort((a: any, b: any) => {
-        const aId = a._id || a.id;
-        const bId = b._id || b.id;
-        if (aId === currentUserId) return -1;
-        if (bId === currentUserId) return 1;
-        return 0;
-      });
-      
-      setFollowing(sortedFollowing);
+      // Use publicApi for unauthenticated users, api for authenticated
+      if (currentUser) {
+        const { default: api } = await import('@/lib/api');
+        const response = await api.get(`/follows/following/${targetUserId}`);
+        
+        // Sort following to put current user first
+        const followingList = response.data.following || [];
+        const currentUserId = currentUser.id;
+        const sortedFollowing = followingList.sort((a: any, b: any) => {
+          const aId = a._id || a.id;
+          const bId = b._id || b.id;
+          if (aId === currentUserId) return -1;
+          if (bId === currentUserId) return 1;
+          return 0;
+        });
+        
+        setFollowing(sortedFollowing);
+      } else {
+        // Unauthenticated - use publicApi
+        const response = await publicApi.get(`/follows/following/${targetUserId}`);
+        setFollowing(response.data.following || []);
+      }
     } catch (error) {
       console.error('Failed to fetch following:', error);
       toast.error('Failed to load following');
@@ -371,21 +388,9 @@ export default function UsernamePage() {
   const handleShowFollowers = () => {
     console.log('=== handleShowFollowers called ===');
     console.log('currentUser:', currentUser);
-    console.log('localStorage token:', localStorage.getItem('token'));
     
-    // Check both currentUser and localStorage token
-    const hasAuth = currentUser && localStorage.getItem('token');
-    
-    if (!hasAuth) {
-      console.log('No authentication - showing login modal for followers');
-      console.log('Setting pendingAction to: followers');
-      setPendingAction('followers');
-      setShowLoginModal(true);
-      console.log('showLoginModal set to:', true);
-      return;
-    }
-    
-    console.log('User is authenticated, showing followers modal');
+    // Allow unauthenticated users to view followers
+    console.log('Showing followers modal');
     setShowFollowersModal(true);
     fetchFollowers();
   };
@@ -393,21 +398,9 @@ export default function UsernamePage() {
   const handleShowFollowing = () => {
     console.log('=== handleShowFollowing called ===');
     console.log('currentUser:', currentUser);
-    console.log('localStorage token:', localStorage.getItem('token'));
     
-    // Check both currentUser and localStorage token
-    const hasAuth = currentUser && localStorage.getItem('token');
-    
-    if (!hasAuth) {
-      console.log('No authentication - showing login modal for following');
-      console.log('Setting pendingAction to: following');
-      setPendingAction('following');
-      setShowLoginModal(true);
-      console.log('showLoginModal set to:', true);
-      return;
-    }
-    
-    console.log('User is authenticated, showing following modal');
+    // Allow unauthenticated users to view following
+    console.log('Showing following modal');
     setShowFollowingModal(true);
     fetchFollowing();
   };
@@ -467,7 +460,63 @@ export default function UsernamePage() {
       setSignupEmail('');
     } catch (error: any) {
       console.error('Failed to send verification email:', error);
-      toast.error(error.response?.data?.message || 'Failed to send verification email');
+      
+      // If email already exists, send login link instead
+      if (error.response?.data?.message?.includes('already exists') || 
+          error.response?.data?.message?.includes('Email already')) {
+        try {
+          const profileUserId = profileUser?._id || profileUser?.id;
+          
+          // Send login link for existing user
+          const response = await publicApi.post('/auth/send-login-link', {
+            email: signupEmail,
+            profileUserId: profileUserId,
+            action: currentPendingAction,
+            profileUsername: username,
+          });
+          
+          // Check if user was logged in directly (already verified)
+          if (response.data.token) {
+            // User is already verified, log them in directly using auth store
+            setAuth(response.data.user, response.data.token);
+            
+            // Close modal
+            setShowLoginModal(false);
+            
+            // Show success message based on action result
+            if (currentPendingAction === 'follow') {
+              if (response.data.actionResult === 'followed') {
+                toast.success('Logged in and followed successfully!');
+              } else if (response.data.actionResult === 'already_following') {
+                toast.success('Logged in successfully! You are already following this user.');
+              } else {
+                toast.success('Logged in successfully!');
+              }
+            } else if (currentPendingAction === 'followers') {
+              toast.success('Logged in successfully!');
+            } else if (currentPendingAction === 'following') {
+              toast.success('Logged in successfully!');
+            }
+            
+            // Refresh the page to update the UI
+            window.location.reload();
+          } else {
+            // User needs to verify, email sent
+            setShowLoginModal(false);
+            toast.success('Login link sent! Please check your email to continue.');
+          }
+          
+          // Reset
+          setPendingAction(null);
+          setSignupName('');
+          setSignupEmail('');
+        } catch (loginError: any) {
+          console.error('Failed to send login link:', loginError);
+          toast.error(loginError.response?.data?.message || 'Failed to send login link');
+        }
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to send verification email');
+      }
     } finally {
       setIsCreatingAccount(false);
     }
@@ -571,16 +620,13 @@ export default function UsernamePage() {
           </div>
 
           {/* Name and Username */}
-          <div className="text-center mb-2">
-            <div className="flex items-center justify-center gap-2 mb-1">
+          <div className="flex flex-col items-center mb-2">
+            <div className="flex items-center justify-center gap-2 mb-1 relative">
               <h1 className={`text-xl font-bold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>{profileUser.displayName || profileUser.name}</h1>
-              <svg className="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-6 h-6 text-green-500 absolute" style={{ left: '100%', marginLeft: '8px' }} fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
             </div>
-            {profileUser.username && (
-              <p className={`text-base ${theme === 'light' ? 'text-gray-600' : 'text-gray-300'}`}>@{profileUser.username}</p>
-            )}
           </div>
 
           {/* Follow Button and Stats */}
@@ -717,21 +763,7 @@ export default function UsernamePage() {
                     : 'bg-white/90'
                 }`}
               >
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-gray-100">
-                  <img 
-                    src={`https://www.google.com/s2/favicons?domain=${new URL(link.url).hostname}&sz=128`}
-                    alt={link.title}
-                    className="w-6 h-6 object-contain"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                      const parent = target.parentElement;
-                      if (parent) {
-                        parent.className = `w-8 h-8 ${getLinkIconBgColor(link.url)} rounded-lg flex items-center justify-center flex-shrink-0`;
-                      }
-                    }}
-                  />
-                </div>
+                <LinkIcon url={link.url} title={link.title} />
                 <div className="flex-1 text-center">
                   <div className="text-black font-semibold text-sm">{link.title}</div>
                 </div>
@@ -745,8 +777,8 @@ export default function UsernamePage() {
       </div>
 
       {/* Followers Modal */}
-      {showFollowersModal && currentUser && (
-        <div className={`fixed inset-0 ${theme === 'light' ? 'bg-black/40' : 'bg-black/60'} backdrop-blur-sm z-50 flex items-end`} onClick={() => setShowFollowersModal(false)}>
+      {showFollowersModal && (
+        <div className={`fixed inset-0 ${theme === 'light' ? 'bg-black/40' : 'bg-black/60'} backdrop-blur-sm z-[60] flex items-end`} onClick={() => setShowFollowersModal(false)}>
           <div 
             className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
             onClick={(e) => e.stopPropagation()}
@@ -817,8 +849,8 @@ export default function UsernamePage() {
       )}
 
       {/* Following Modal */}
-      {showFollowingModal && currentUser && (
-        <div className={`fixed inset-0 ${theme === 'light' ? 'bg-black/40' : 'bg-black/60'} backdrop-blur-sm z-50 flex items-end`} onClick={() => setShowFollowingModal(false)}>
+      {showFollowingModal && (
+        <div className={`fixed inset-0 ${theme === 'light' ? 'bg-black/40' : 'bg-black/60'} backdrop-blur-sm z-[60] flex items-end`} onClick={() => setShowFollowingModal(false)}>
           <div 
             className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
             onClick={(e) => e.stopPropagation()}
@@ -1013,16 +1045,6 @@ export default function UsernamePage() {
               >
                 {isCreatingAccount ? 'Creating account...' : 'Continue'}
               </button>
-
-              <p className="text-center text-sm text-gray-600">
-                Already have an account?{' '}
-                <button
-                  onClick={() => router.push('/login')}
-                  className="text-pink-500 hover:text-pink-600 font-semibold"
-                >
-                  Log in
-                </button>
-              </p>
             </div>
           </div>
         </div>
@@ -1035,13 +1057,13 @@ export default function UsernamePage() {
         /* Home button for non-logged-in users */
         <div className="fixed bottom-6 right-6 z-50">
           <button
-            onClick={() => router.push('/login')}
+            onClick={() => router.push('/')}
             className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 ${
               theme === 'light'
                 ? 'bg-white text-black border-2 border-gray-300'
                 : 'bg-white/90 text-black'
             }`}
-            aria-label="Go to login"
+            aria-label="Go to home"
           >
             <svg
               className="w-6 h-6"

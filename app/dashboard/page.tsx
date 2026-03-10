@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useBackground } from '@/hooks/useBackground';
 import { useTheme } from '@/hooks/useTheme';
-import { getLinkIcon, getLinkIconBgColor } from '@/utils/linkIcons';
 import { getBackgroundStyle, getTextColorClass } from '@/config/theme.config';
 import Image from 'next/image';
 import api from '@/lib/api';
@@ -14,6 +13,7 @@ import AppHeader from '@/components/AppHeader';
 import BottomNav from '@/components/BottomNav';
 import ImageCropper from '@/components/ImageCropper';
 import AvatarPreview from '@/components/AvatarPreview';
+import LinkIcon from '@/components/LinkIcon';
 
 interface Link {
   _id: string;
@@ -687,27 +687,8 @@ export default function DashboardPage() {
                     : 'bg-white/90'
                 }`}
               >
-                {/* Icon on the left - using actual favicon */}
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-gray-100">
-                  <img 
-                    src={`https://www.google.com/s2/favicons?domain=${new URL(link.url).hostname}&sz=128`}
-                    alt={link.title}
-                    className="w-6 h-6 object-contain"
-                    onError={(e) => {
-                      // Fallback to custom icon if favicon fails to load
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                      const parent = target.parentElement;
-                      if (parent) {
-                        parent.className = `w-8 h-8 ${getLinkIconBgColor(link.url)} rounded-lg flex items-center justify-center flex-shrink-0`;
-                        parent.innerHTML = '';
-                        const iconContainer = document.createElement('div');
-                        parent.appendChild(iconContainer);
-                        // This is a workaround - ideally we'd render the React component properly
-                      }
-                    }}
-                  />
-                </div>
+                {/* Icon on the left */}
+                <LinkIcon url={link.url} title={link.title} />
                 
                 {/* Title centered */}
                 <a 

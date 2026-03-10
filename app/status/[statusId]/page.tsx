@@ -208,7 +208,51 @@ export default function StatusDetailPage() {
       setSignupEmail('');
     } catch (error: any) {
       console.error('Failed to send verification email:', error);
-      toast.error(error.response?.data?.message || 'Failed to send verification email');
+      
+      // If email already exists, send login link instead
+      if (error.response?.data?.message?.includes('already exists') || 
+          error.response?.data?.message?.includes('Email already')) {
+        try {
+          const publicApi = (await import('@/lib/publicApi')).default;
+          const setAuth = useAuthStore.getState().setAuth;
+          
+          // Send login link for existing user
+          const response = await publicApi.post('/auth/send-login-link', {
+            email: signupEmail,
+            profileUserId: status?.author._id,
+            action: 'view_status',
+            profileUsername: status?.author.username || status?.author.name,
+          });
+          
+          // Check if user was logged in directly (already verified)
+          if (response.data.token) {
+            // User is already verified, log them in directly using auth store
+            setAuth(response.data.user, response.data.token);
+            
+            // Close modal
+            setShowLoginModal(false);
+            
+            // Show success message
+            toast.success('Logged in successfully!');
+            
+            // Refresh the page to update the UI
+            window.location.reload();
+          } else {
+            // User needs to verify, email sent
+            setShowLoginModal(false);
+            toast.success('Login link sent! Please check your email to continue.');
+          }
+          
+          // Reset
+          setSignupName('');
+          setSignupEmail('');
+        } catch (loginError: any) {
+          console.error('Failed to send login link:', loginError);
+          toast.error(loginError.response?.data?.message || 'Failed to send login link');
+        }
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to send verification email');
+      }
     } finally {
       setIsCreatingAccount(false);
     }
@@ -643,7 +687,7 @@ export default function StatusDetailPage() {
 
       {/* Floating Home Button */}
       <button
-        onClick={() => router.push('/dashboard')}
+        onClick={() => router.push('/')}
         className="fixed bottom-6 right-6 w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition z-20"
       >
         <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -704,16 +748,6 @@ export default function StatusDetailPage() {
               >
                 {isCreatingAccount ? 'Creating account...' : 'Continue'}
               </button>
-
-              <p className="text-center text-sm text-gray-600">
-                Already have an account?{' '}
-                <button
-                  onClick={() => router.push('/login')}
-                  className="text-pink-500 hover:text-pink-600 font-semibold"
-                >
-                  Log in
-                </button>
-              </p>
             </div>
           </div>
         </div>
