@@ -51,6 +51,16 @@ export default function HelpCenterModal({ isOpen, onClose }: HelpCenterModalProp
     setSelectedArticle(null);
   };
 
+  const handleContactSupport = () => {
+    // Get the first admin email from environment or use a default
+    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'support@tarpup.com';
+    const subject = encodeURIComponent('Support Request - TarpUp');
+    const body = encodeURIComponent('Hello,\n\nI need help with...\n\nThank you!');
+    
+    // Open the default email client
+    window.location.href = `mailto:${adminEmail}?subject=${subject}&body=${body}`;
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -137,7 +147,10 @@ export default function HelpCenterModal({ isOpen, onClose }: HelpCenterModalProp
                     <p className="text-sm mb-4 text-blue-700">
                       Our support team is available 24/7.
                     </p>
-                    <button className="bg-blue-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-600 transition">
+                    <button 
+                      onClick={handleContactSupport}
+                      className="bg-blue-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-600 transition"
+                    >
                       Contact Support
                     </button>
                   </div>
