@@ -269,7 +269,7 @@ export default function StatusDetailPage() {
   if (!status) {
     return (
       <div
-        className="min-h-screen flex items-center justify-center"
+        className="min-h-screen w-full max-w-md mx-auto flex items-center justify-center"
         style={
           theme === 'dark'
             ? { background: '#000000' }
@@ -319,7 +319,7 @@ export default function StatusDetailPage() {
 
   return (
     <div
-      className="min-h-screen"
+      className="min-h-screen w-full max-w-md mx-auto"
       style={
         theme === 'dark'
           ? { background: '#000000' }

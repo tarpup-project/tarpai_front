@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import AppHeader from '@/components/AppHeader';
 import BottomNav from '@/components/BottomNav';
 import ImageCropper from '@/components/ImageCropper';
+import EditRepostModal from '@/components/EditRepostModal';
 
 interface Status {
   id: string;
@@ -65,7 +66,6 @@ export default function StatusPage() {
   const [currentStatusIndex, setCurrentStatusIndex] = useState(0);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showRepostModal, setShowRepostModal] = useState(false);
-  const [repostContent, setRepostContent] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newStatusContent, setNewStatusContent] = useState('');
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
@@ -269,9 +269,6 @@ export default function StatusPage() {
   };
 
   const handleEditRepost = () => {
-    const currentStatus = getCurrentStatus();
-    if (!currentStatus) return;
-    setRepostContent(currentStatus.content);
     setShowStatusModal(false);
     setShowRepostModal(true);
   };
@@ -280,14 +277,6 @@ export default function StatusPage() {
     const currentStatus = getCurrentStatus();
     if (!currentStatus) return;
     try {
-      const formData = new FormData();
-      // Only append content if it's not empty, otherwise send empty string
-      formData.append('content', repostContent?.trim() || '');
-      
-      await api.post(`/status/${currentStatus.id}/edit-repost`, formData);
-      toast.success('Reposted with edits successfully!');
-      setShowRepostModal(false);
-      setRepostContent('');
       fetchStatuses();
     } catch (error) {
       console.error('Failed to repost:', error);
@@ -1048,68 +1037,16 @@ export default function StatusPage() {
       )}
 
       {/* Edit & Repost Modal */}
-      {showRepostModal && getCurrentStatus() && (
-        <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setShowRepostModal(false)}
-        >
-          <div 
-            className="bg-white rounded-3xl max-w-md w-full p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-black">Edit & Repost</h2>
-              <button
-                onClick={() => setShowRepostModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Content Editor */}
-            <textarea
-              value={repostContent}
-              onChange={(e) => setRepostContent(e.target.value)}
-              className="w-full bg-gray-100 text-black rounded-2xl p-4 mb-4 min-h-[120px] focus:outline-none focus:ring-2 focus:ring-gray-300 resize-none"
-              placeholder="Add your thoughts..."
-            />
-
-            {/* Attachments - Only show if images exist */}
-            {getCurrentStatus()!.images && getCurrentStatus()!.images.length > 0 && (
-              <div className="mb-4">
-                <p className="text-sm font-semibold text-gray-600 mb-2">ATTACHMENTS</p>
-                <div className="grid grid-cols-4 gap-2">
-                  {getCurrentStatus()!.images.map((img, idx) => (
-                    <Image
-                      key={idx}
-                      src={img}
-                      alt="Attachment"
-                      width={100}
-                      height={100}
-                      className="w-full h-20 object-cover rounded-xl"
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Confirm Button */}
-            <button
-              onClick={handleConfirmRepost}
-              className="w-full bg-black text-white py-3 rounded-2xl font-semibold hover:bg-gray-800 transition flex items-center justify-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Confirm Repost
-            </button>
-          </div>
-        </div>
-      )}
+      <EditRepostModal
+        isOpen={showRepostModal}
+        status={getCurrentStatus()}
+        initialContent={getCurrentStatus()?.content}
+        onClose={() => setShowRepostModal(false)}
+        onSuccess={() => {
+          setShowRepostModal(false);
+          fetchStatuses();
+        }}
+      />
 
       {/* Image Cropper */}
       {showCropper && imageToCrop && (

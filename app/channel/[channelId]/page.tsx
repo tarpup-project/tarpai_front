@@ -565,9 +565,9 @@ export default function ChannelPage() {
 
       {/* Create Post Modal */}
       {showCreatePostModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowCreatePostModal(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center" onClick={() => setShowCreatePostModal(false)}>
           <div 
-            className="bg-white rounded-t-3xl w-full max-h-[90vh] flex flex-col animate-slide-up"
+            className="bg-white rounded-t-3xl w-full max-w-md max-h-[90vh] flex flex-col animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 border-b border-gray-200 flex-shrink-0">
@@ -607,9 +607,9 @@ export default function ChannelPage() {
 
       {/* Edit Channel Modal */}
       {showEditChannelModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowEditChannelModal(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center" onClick={() => setShowEditChannelModal(false)}>
           <div 
-            className={`bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up`}
+            className={`bg-white rounded-t-3xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col animate-slide-up`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>

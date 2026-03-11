@@ -297,9 +297,9 @@ export default function AppHeader() {
 
       {/* Notifications Modal */}
       {mounted && showNotificationsModal && createPortal(
-        <div className={`fixed inset-0 ${theme === 'light' ? 'bg-black/40' : 'bg-black/60'} backdrop-blur-sm z-[100] flex items-end`} onClick={() => setShowNotificationsModal(false)}>
+        <div className={`fixed inset-0 ${theme === 'light' ? 'bg-black/40' : 'bg-black/60'} backdrop-blur-sm z-[100] flex items-end justify-center`} onClick={() => setShowNotificationsModal(false)}>
           <div 
-            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
+            className="bg-white rounded-t-3xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

@@ -1392,11 +1392,15 @@ export default function ChatsPage() {
       {activeTab === 'chats' && (
         <button
           onClick={handleOpenNewChat}
-          className={`fixed bottom-24 right-6 w-14 h-14 backdrop-blur-md border rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 z-30 ${
+          className={`fixed bottom-24 left-1/2 transform -translate-x-1/2 w-14 h-14 backdrop-blur-md border rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 z-30 ${
             theme === 'light' 
               ? 'bg-pink-500 hover:bg-pink-600 border-pink-500' 
               : 'bg-white/20 border-white/10 hover:bg-white/30'
           }`}
+          style={{
+            right: 'calc((100% - 448px) / 2 + 24px)',
+            left: 'auto'
+          }}
         >
           <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1406,9 +1410,9 @@ export default function ChatsPage() {
 
       {/* Create Channel Modal */}
       {showCreateChannelModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowCreateChannelModal(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center" onClick={() => setShowCreateChannelModal(false)}>
           <div 
-            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
+            className="bg-white rounded-t-3xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 border-b border-gray-200">
@@ -1508,9 +1512,9 @@ export default function ChatsPage() {
 
       {/* Broadcast Modal */}
       {showBroadcastModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowBroadcastModal(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center" onClick={() => setShowBroadcastModal(false)}>
           <div 
-            className="bg-white rounded-t-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-slide-up"
+            className="bg-white rounded-t-3xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -1584,9 +1588,9 @@ export default function ChatsPage() {
 
       {/* New Chat Modal */}
       {showNewChatModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowNewChatModal(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center" onClick={() => setShowNewChatModal(false)}>
           <div 
-            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
+            className="bg-white rounded-t-3xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 border-b border-gray-200">

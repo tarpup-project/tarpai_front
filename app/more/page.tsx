@@ -46,7 +46,7 @@ export default function MorePage() {
       icon: '🕐',
       bgColor: 'bg-purple-500',
       hasArrow: true,
-      onClick: () => router.push('/status')
+      onClick: () => router.push('/status-history')
     },
     {
       id: 'whats-new',

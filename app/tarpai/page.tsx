@@ -358,7 +358,7 @@ export default function TarpAIPage() {
         </div>
 
         {/* Input Area */}
-        <div className="fixed bottom-20 left-0 right-0 px-4 pb-4">
+        <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 w-full max-w-md px-4 pb-4">
           <div
             className={`flex items-end gap-2 rounded-3xl px-4 py-3 ${
               theme === 'light'
