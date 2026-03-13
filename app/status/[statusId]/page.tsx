@@ -181,7 +181,6 @@ export default function StatusDetailPage() {
     if (navigator.share) {
       navigator.share({
         title: shareText,
-        text: status.content,
         url: statusUrl,
       }).catch((error) => {
         if (error.name !== 'AbortError') {
@@ -320,21 +319,7 @@ export default function StatusDetailPage() {
     return (
       <div
         className="min-h-screen w-full max-w-md mx-auto flex items-center justify-center"
-        style={
-          theme === 'dark'
-            ? { background: '#000000' }
-            : theme === 'light'
-            ? { background: '#e6e6e6' }
-            : {
-                background: background
-                  ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${background})`
-                  : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-                backgroundAttachment: 'fixed',
-              }
-        }
+        style={{ background: '#e6e6e6' }}
       >
         <div className="text-center px-4">
           <div className="bg-white rounded-3xl p-8 max-w-md mx-auto">
@@ -370,21 +355,7 @@ export default function StatusDetailPage() {
   return (
     <div
       className="min-h-screen w-full max-w-md mx-auto relative"
-      style={
-        theme === 'dark'
-          ? { background: '#000000' }
-          : theme === 'light'
-          ? { background: '#e6e6e6' }
-          : {
-              background: background
-                ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${background})`
-                : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              backgroundAttachment: 'fixed',
-            }
-      }
+      style={{ background: '#e6e6e6' }}
     >
       {/* Check if status has images */}
       {status.images && status.images.length > 0 ? (

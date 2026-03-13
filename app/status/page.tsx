@@ -207,7 +207,6 @@ export default function StatusPage() {
     if (navigator.share) {
       navigator.share({
         title: shareText,
-        text: status.content,
         url: statusUrl,
       }).catch((error) => {
         if (error.name !== 'AbortError') {
