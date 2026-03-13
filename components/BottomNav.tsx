@@ -31,6 +31,7 @@ export default function BottomNav() {
         
         // Check if any conversation has urgent messages
         const hasUrgent = conversations.some((conv: any) => conv.hasUrgentMessage === true);
+        console.log('🔔 BottomNav urgent check:', hasUrgent);
         setHasUrgentMessages(hasUrgent);
       } catch (error) {
         console.error('Failed to check urgent messages:', error);
@@ -50,11 +51,19 @@ export default function BottomNav() {
       }
     };
 
+    // Listen for urgent message updates from chats page
+    const handleUrgentMessageUpdate = () => {
+      console.log('🔔 BottomNav received urgent message update event');
+      checkUrgentMessages();
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('urgentMessageUpdate', handleUrgentMessageUpdate);
 
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('urgentMessageUpdate', handleUrgentMessageUpdate);
     };
   }, []);
 
@@ -108,7 +117,7 @@ export default function BottomNav() {
               <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-yellow-500 rounded-full border border-black"></div>
             )}
           </div>
-          <span className="text-xs">Chats</span>
+          <span className="text-xs">Messages</span>
         </button>
         
         <button 

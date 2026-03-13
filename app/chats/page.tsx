@@ -10,6 +10,8 @@ import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import AppHeader from '@/components/AppHeader';
 import BottomNav from '@/components/BottomNav';
+import { WS_URL } from '@/config/api.config';
+import { io, Socket } from 'socket.io-client';
 
 interface Conversation {
   id: string;
@@ -413,6 +415,9 @@ export default function ChatsPage() {
   const [mainSearchQuery, setMainSearchQuery] = useState('');
   const [broadcastCount, setBroadcastCount] = useState(0);
   const [maxBroadcasts] = useState(2);
+  
+  // Socket connection for real-time updates
+  const socketRef = useRef<Socket | null>(null);
 
   // Debug broadcasts state changes
   useEffect(() => {
@@ -458,6 +463,129 @@ export default function ChatsPage() {
     }
 
     fetchConversations();
+
+    // Setup socket connection for real-time updates
+    if (token) {
+      const socket = io(WS_URL, {
+        auth: { token },
+        transports: ['websocket', 'polling'], // Allow fallback to polling
+        timeout: 20000,
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 5,
+      });
+
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
+        console.log('🔌 Chats page socket connected');
+        // Immediately fetch conversations when socket connects
+        fetchConversations();
+      });
+
+      socket.on('connect_error', (error) => {
+        console.error('🔌 Chats page socket connection error:', error);
+      });
+
+      socket.on('reconnect', (attemptNumber) => {
+        console.log('🔌 Chats page socket reconnected after', attemptNumber, 'attempts');
+        // Refresh conversations after reconnection
+        fetchConversations();
+      });
+
+      // Listen for new messages to update conversation list
+      socket.on('new_message', (message: any) => {
+        console.log('📨 Received new message in chats page:', message);
+        
+        // Immediately update the conversation if we can identify it
+        if (message.conversationId) {
+          setConversations(prev => {
+            const updated = prev.map(conv => {
+              if (conv.id === message.conversationId) {
+                const updatedConv = {
+                  ...conv,
+                  lastMessage: {
+                    content: message.content,
+                    type: message.type,
+                    createdAt: message.createdAt,
+                    sender: message.sender
+                  },
+                  lastActivity: message.createdAt,
+                  unreadCount: conv.unreadCount + (message.sender._id !== currentUser?.id ? 1 : 0),
+                  hasUrgentMessage: message.isUrgent || conv.hasUrgentMessage
+                };
+                console.log('📨 Updated conversation:', updatedConv.id, 'hasUrgent:', updatedConv.hasUrgentMessage);
+                
+                // Trigger urgent message update event if this is an urgent message
+                if (message.isUrgent) {
+                  console.log('📨 Triggering urgent message update event');
+                  window.dispatchEvent(new CustomEvent('urgentMessageUpdate'));
+                }
+                
+                return updatedConv;
+              }
+              return conv;
+            });
+            
+            // Sort by urgent messages first, then by last activity
+            return updated.sort((a, b) => {
+              // First priority: urgent messages
+              if (a.hasUrgentMessage && !b.hasUrgentMessage) return -1;
+              if (!a.hasUrgentMessage && b.hasUrgentMessage) return 1;
+              
+              // Second priority: last activity time
+              return new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime();
+            });
+          });
+        }
+        
+        // Also do a delayed refresh to ensure consistency with server
+        setTimeout(() => {
+          console.log('📨 Delayed refresh after new message');
+          fetchConversations();
+        }, 100);
+      });
+
+      // Listen for conversation updates (includes urgent message flags)
+      socket.on('conversation_updated', (updatedConversation: any) => {
+        console.log('🔄 Received conversation update in chats page:', updatedConversation);
+        console.log('🔄 Updated conversation hasUrgentMessage:', updatedConversation.hasUrgentMessage);
+        
+        // Update the specific conversation in the list immediately for fast UI updates
+        setConversations(prev => {
+          const updated = prev.map(conv => 
+            conv.id === updatedConversation.id ? updatedConversation : conv
+          );
+          // If conversation doesn't exist, add it at the top (most recent)
+          if (!prev.find(conv => conv.id === updatedConversation.id)) {
+            console.log('🔄 Adding new conversation:', updatedConversation.id);
+            updated.unshift(updatedConversation);
+          }
+          // Sort by urgent messages first, then by last activity
+          const sorted = updated.sort((a, b) => {
+            // First priority: urgent messages
+            if (a.hasUrgentMessage && !b.hasUrgentMessage) return -1;
+            if (!a.hasUrgentMessage && b.hasUrgentMessage) return 1;
+            
+            // Second priority: last activity time
+            return new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime();
+          });
+          
+          console.log('🔄 Sorted conversations, urgent ones first:', sorted.filter(c => c.hasUrgentMessage).map(c => c.id));
+          
+          // Trigger a custom event to notify BottomNav about urgent message changes
+          if (updatedConversation.hasUrgentMessage) {
+            window.dispatchEvent(new CustomEvent('urgentMessageUpdate'));
+          }
+          
+          return sorted;
+        });
+      });
+
+      socket.on('disconnect', () => {
+        console.log('🔌 Chats page socket disconnected');
+      });
+    }
 
     // Fetch channels when activeTab is channels
     if (activeTab === 'channels') {
@@ -513,6 +641,12 @@ export default function ChatsPage() {
 
     // Cleanup interval on unmount
     return () => {
+      // Disconnect socket
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+      
       // Unregister from chats page
       registerChatsPageStatus(false);
       window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -528,7 +662,8 @@ export default function ChatsPage() {
   const fetchConversations = async () => {
     try {
       const response = await api.get('/chat/conversations');
-      console.log('Raw conversations:', response.data);
+      console.log('📋 Raw conversations from API:', response.data.length, 'conversations');
+      console.log('📋 Urgent conversations:', response.data.filter((c: Conversation) => c.hasUrgentMessage).map((c: Conversation) => ({ id: c.id, hasUrgent: c.hasUrgentMessage })));
       
       // Deduplicate conversations by participant ID (only for direct messages)
       const uniqueConversations = response.data.reduce((acc: Conversation[], conv: Conversation) => {
@@ -560,7 +695,8 @@ export default function ChatsPage() {
         return acc;
       }, []);
       
-      console.log('Deduplicated conversations:', uniqueConversations);
+      console.log('📋 Deduplicated conversations:', uniqueConversations.length, 'conversations');
+      console.log('📋 Urgent after dedup:', uniqueConversations.filter((c: Conversation) => c.hasUrgentMessage).map((c: Conversation) => ({ id: c.id, hasUrgent: c.hasUrgentMessage })));
       setConversations(uniqueConversations);
       
       // Check active users after conversations are loaded
@@ -953,7 +1089,7 @@ export default function ChatsPage() {
                     : 'text-white hover:bg-white/10'
               }`}
             >
-              Chats
+              Messages
             </button>
             <button
               onClick={() => handleTabSwitch('channels')}

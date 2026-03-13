@@ -764,7 +764,7 @@ export default function UsernamePage() {
                 }`}
               >
                 <LinkIcon url={link.url} title={link.title} />
-                <div className="flex-1 text-center">
+                <div className="flex-1 text-center px-3">
                   <div className="text-black font-semibold text-sm">{link.title}</div>
                 </div>
                 <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

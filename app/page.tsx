@@ -123,7 +123,7 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex items-center justify-center px-4 py-12 w-full overflow-x-hidden">
+      <main className="flex-1 flex items-center justify-center px-4 py-6 w-full overflow-x-hidden">
         <div className="max-w-2xl w-full">
           {/* Badge */}
           <div className="mb-8 flex justify-center">
@@ -131,7 +131,7 @@ export default function Home() {
               ✨ AI-Driven Moderation
             </span>
           </div>
-          <p className="text-gray-400 text-lg mb-12 max-w-xl text-center mx-auto">
+          <p className="text-gray-400 text-lg mb-8 max-w-xl text-center mx-auto">
            Use link-in-bio AI to communicate directly with followers. Whether you are online or offline, your AI notifies you when it recieves important messages from any follower.
           </p>
            <div className="mb-8 flex justify-center">
