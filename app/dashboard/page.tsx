@@ -38,6 +38,9 @@ export default function DashboardPage() {
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [showAddLinkModal, setShowAddLinkModal] = useState(false);
+  const [showPlatformDropdown, setShowPlatformDropdown] = useState(false);
+  const [selectedPlatform, setSelectedPlatform] = useState('');
+  const [activeTab, setActiveTab] = useState('socials'); // 'socials' or 'website'
   const [links, setLinks] = useState<Link[]>([]);
   const [followers, setFollowers] = useState<any[]>([]);
   const [following, setFollowing] = useState<any[]>([]);
@@ -695,7 +698,7 @@ export default function DashboardPage() {
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 text-center"
+                  className="flex-1 text-center px-3"
                 >
                   <div className="text-black font-semibold text-sm">{link.title}</div>
                 </a>
@@ -864,53 +867,162 @@ export default function DashboardPage() {
 
       {/* Add Link Modal */}
       {showAddLinkModal && (
-        <div className={`fixed inset-0 ${theme === 'dark' ? 'bg-black/80' : 'bg-black/40'} backdrop-blur-sm z-50 flex items-center justify-center px-6`}>
-          <div className={`bg-white rounded-2xl p-8 w-full max-w-md relative`}>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center px-6">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md relative">
             <button
-              onClick={() => setShowAddLinkModal(false)}
-              className="absolute top-6 right-6 text-gray-600 hover:text-black"
+              onClick={() => {
+                setShowAddLinkModal(false);
+                setShowPlatformDropdown(false);
+                setSelectedPlatform('');
+                setActiveTab('socials');
+                setNewLinkTitle('');
+                setNewLinkUrl('');
+              }}
+              className="absolute top-6 right-6 w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 hover:text-black"
             >
-              ✕
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
             </button>
 
             <h2 className="text-2xl font-bold mb-6 text-black">Add New Link</h2>
 
+            {/* Tabs */}
+            <div className="flex bg-gray-200 rounded-2xl p-1 mb-6">
+              <button 
+                onClick={() => {
+                  setActiveTab('socials');
+                  setShowPlatformDropdown(false);
+                  setSelectedPlatform('');
+                  setNewLinkTitle('');
+                  setNewLinkUrl('');
+                }}
+                className={`flex-1 py-2 px-4 rounded-xl font-medium transition ${
+                  activeTab === 'socials' 
+                    ? 'bg-white text-black' 
+                    : 'text-gray-600'
+                }`}
+              >
+                Socials
+              </button>
+              <button 
+                onClick={() => {
+                  setActiveTab('website');
+                  setShowPlatformDropdown(false);
+                  setSelectedPlatform('');
+                  setNewLinkTitle('');
+                  setNewLinkUrl('');
+                }}
+                className={`flex-1 py-2 px-4 rounded-xl font-medium transition ${
+                  activeTab === 'website' 
+                    ? 'bg-white text-black' 
+                    : 'text-gray-600'
+                }`}
+              >
+                Website
+              </button>
+            </div>
+
             <div className="space-y-6">
+              {/* Platform Dropdown - Only show for Socials tab */}
+              {activeTab === 'socials' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    PLATFORM
+                  </label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowPlatformDropdown(!showPlatformDropdown)}
+                      className="w-full bg-white border-2 border-pink-500 text-left rounded-2xl px-4 py-3 focus:outline-none flex items-center justify-between"
+                    >
+                      <span className={selectedPlatform ? 'text-black' : 'text-gray-500'}>
+                        {selectedPlatform || 'Select a platform...'}
+                      </span>
+                      <svg 
+                        className={`w-5 h-5 text-gray-400 transition-transform ${showPlatformDropdown ? 'rotate-180' : ''}`} 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    
+                    {/* Custom Dropdown */}
+                    {showPlatformDropdown && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-2xl shadow-lg z-20 max-h-48 overflow-y-auto">
+                        <div className="py-1">
+                          {['Instagram', 'Twitter', 'Facebook', 'LinkedIn', 'TikTok', 'YouTube'].map((platform) => (
+                            <button
+                              key={platform}
+                              type="button"
+                              onClick={() => {
+                                setSelectedPlatform(platform);
+                                setNewLinkTitle(platform);
+                                setShowPlatformDropdown(false);
+                              }}
+                              className="w-full text-left px-4 py-3 text-gray-900 hover:bg-gray-50 transition-colors block"
+                            >
+                              {platform}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Title */}
               <div>
-                <label htmlFor="linkTitle" className="block text-sm text-gray-600 mb-2">
-                  Title
+                <label className="block text-sm font-medium text-gray-600 mb-2">
+                  TITLE
                 </label>
                 <input
-                  id="linkTitle"
                   type="text"
                   value={newLinkTitle}
                   onChange={(e) => setNewLinkTitle(e.target.value)}
-                  className="w-full bg-gray-100 border-gray-300 text-black border rounded-lg px-4 py-3 focus:outline-none focus:border-gray-400"
-                  placeholder="e.g. My Portfolio"
+                  className="w-full bg-gray-100 text-gray-700 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  placeholder={activeTab === 'socials' ? 'e.g. Instagram' : 'e.g. My Portfolio'}
                 />
               </div>
 
+              {/* URL */}
               <div>
-                <label htmlFor="linkUrl" className="block text-sm text-gray-600 mb-2">
-                  URL
+                <label className="block text-sm font-medium text-gray-600 mb-2">
+                  {activeTab === 'socials' ? 'LINK' : 'URL'}
                 </label>
                 <input
-                  id="linkUrl"
                   type="url"
                   value={newLinkUrl}
                   onChange={(e) => setNewLinkUrl(e.target.value)}
-                  className="w-full bg-gray-100 border-gray-300 text-black border rounded-lg px-4 py-3 focus:outline-none focus:border-gray-400"
-                  placeholder="https://..."
+                  className="w-full bg-gray-100 text-gray-700 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  placeholder={activeTab === 'socials' ? 'https://instagram.com/yourhandle' : 'https://yourwebsite.com'}
                 />
               </div>
 
+              {/* Save Button */}
               <button
                 onClick={handleAddLink}
                 disabled={addingLink}
-                className="w-full bg-gray-600 text-white hover:bg-gray-700 py-3 rounded-full font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2"
+                className={`w-full py-3 rounded-2xl font-semibold transition disabled:opacity-50 ${
+                  theme === 'light' 
+                    ? 'bg-pink-500 hover:bg-pink-600 text-white' 
+                    : 'bg-black hover:bg-gray-800 text-white'
+                }`}
               >
-                <span className="text-xl">+</span>
-                {addingLink ? 'Adding...' : 'Add to Profile'}
+                {addingLink ? 'Saving...' : 'Save Link'}
               </button>
             </div>
           </div>
@@ -920,23 +1032,35 @@ export default function DashboardPage() {
       {/* Edit Link Modal */}
       {showEditLinkModal && editingLink && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center px-6">
-          <div className="bg-white rounded-2xl p-8 w-full max-w-md relative">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md relative">
             <button
               onClick={() => {
                 setShowEditLinkModal(false);
                 setEditingLink(null);
                 setEditLinkForm({ title: '', url: '' });
               }}
-              className="absolute top-6 right-6 text-gray-400 hover:text-white"
+              className="absolute top-6 right-6 text-gray-400 hover:text-gray-600"
             >
-              ✕
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
             </button>
 
-            <h2 className="text-2xl font-bold mb-6">Edit Link</h2>
+            <h2 className="text-2xl font-bold mb-6 text-gray-800">Edit Link</h2>
 
             <div className="space-y-6">
               <div>
-                <label htmlFor="editLinkTitle" className="block text-sm text-gray-400 mb-2">
+                <label htmlFor="editLinkTitle" className="block text-sm text-gray-600 mb-2">
                   Title
                 </label>
                 <input
@@ -944,13 +1068,13 @@ export default function DashboardPage() {
                   type="text"
                   value={editLinkForm.title}
                   onChange={(e) => setEditLinkForm({ ...editLinkForm, title: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gray-600"
+                  className="w-full bg-gray-100 text-gray-700 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
                   placeholder="My Portfolio"
                 />
               </div>
 
               <div>
-                <label htmlFor="editLinkUrl" className="block text-sm text-gray-400 mb-2">
+                <label htmlFor="editLinkUrl" className="block text-sm text-gray-600 mb-2">
                   URL
                 </label>
                 <input
@@ -958,7 +1082,7 @@ export default function DashboardPage() {
                   type="url"
                   value={editLinkForm.url}
                   onChange={(e) => setEditLinkForm({ ...editLinkForm, url: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gray-600"
+                  className="w-full bg-gray-100 text-gray-700 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
                   placeholder="https://example.com"
                 />
               </div>
@@ -966,7 +1090,7 @@ export default function DashboardPage() {
               <button
                 onClick={handleUpdateLink}
                 disabled={editingLinkLoading}
-                className="w-full bg-white text-black py-3 rounded-full font-semibold hover:bg-gray-200 transition disabled:opacity-50"
+                className="w-full bg-black text-white py-3 rounded-2xl font-semibold hover:bg-gray-800 transition disabled:opacity-50"
               >
                 {editingLinkLoading ? 'Updating...' : 'Update Link'}
               </button>

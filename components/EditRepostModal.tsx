@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
@@ -9,6 +9,7 @@ interface EditRepostModalProps {
   onClose: () => void;
   onSuccess?: () => void;
   initialContent?: string;
+  theme?: string;
 }
 
 export default function EditRepostModal({
@@ -17,12 +18,35 @@ export default function EditRepostModal({
   onClose,
   onSuccess,
   initialContent,
+  theme = 'light',
 }: EditRepostModalProps) {
-  const [repostContent, setRepostContent] = useState(initialContent || status?.content || '');
+  const [repostContent, setRepostContent] = useState('');
   const [isReposting, setIsReposting] = useState(false);
+
+  // Helper function to count words
+  const countWords = (text: string) => {
+    return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+  };
+
+  // Update content when modal opens or status changes
+  useEffect(() => {
+    if (isOpen && status) {
+      setRepostContent(initialContent || status?.content || '');
+    }
+  }, [isOpen, status, initialContent]);
 
   const handleConfirmRepost = async () => {
     if (!status) return;
+
+    // Check word limit when images are present
+    if (status?.images && status.images.length > 0 && !!repostContent.trim()) {
+      const wordCount = countWords(repostContent);
+      if (wordCount > 30) {
+        toast.error('Caption must be 30 words or less when images are uploaded');
+        return;
+      }
+    }
+
     setIsReposting(true);
     try {
       const formData = new FormData();
@@ -41,12 +65,17 @@ export default function EditRepostModal({
     }
   };
 
+  const handleClose = () => {
+    setRepostContent('');
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   return (
     <div
       className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div
         className="bg-white rounded-3xl max-w-md w-full p-6"
@@ -56,7 +85,7 @@ export default function EditRepostModal({
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-gray-800">Edit & Repost</h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-400 hover:text-gray-600"
           >
             <svg
@@ -76,12 +105,27 @@ export default function EditRepostModal({
         </div>
 
         {/* Content Editor */}
-        <textarea
-          value={repostContent}
-          onChange={(e) => setRepostContent(e.target.value)}
-          className="w-full bg-gray-100 text-gray-700 rounded-2xl p-4 mb-6 min-h-[160px] focus:outline-none focus:ring-2 focus:ring-gray-300 resize-none text-base placeholder-gray-500"
-          placeholder="Add your thoughts..."
-        />
+        <div className="mb-6">
+          <textarea
+            value={repostContent}
+            onChange={(e) => setRepostContent(e.target.value)}
+            className="w-full bg-gray-100 text-gray-700 rounded-2xl p-4 min-h-[160px] focus:outline-none focus:ring-2 focus:ring-gray-300 resize-none text-base placeholder-gray-500"
+            placeholder="Add your thoughts..."
+          />
+          {/* Word count indicator when images are present */}
+          {status?.images && status.images.length > 0 && !!repostContent.trim() && (
+            <div className="flex justify-between items-center mt-2 px-2">
+              <span className={`text-sm ${
+                countWords(repostContent) > 30 ? 'text-red-500' : 'text-gray-500'
+              }`}>
+                {countWords(repostContent)}/30 words
+              </span>
+              {countWords(repostContent) > 30 && (
+                <span className="text-red-500 text-sm">Caption too long for images</span>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Attachments Section */}
         {status?.images && status.images.length > 0 && (
@@ -106,7 +150,10 @@ export default function EditRepostModal({
         {/* Confirm Button */}
         <button
           onClick={handleConfirmRepost}
-          disabled={isReposting}
+          disabled={
+            isReposting || 
+            (status?.images && status.images.length > 0 && !!repostContent.trim() && countWords(repostContent) > 30)
+          }
           className="w-full bg-black text-white py-3 rounded-2xl font-semibold hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {isReposting ? (

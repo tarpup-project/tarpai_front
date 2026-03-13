@@ -382,10 +382,24 @@ export default function StatusPage() {
     setImagePreviewUrls(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Helper function to count words
+  const countWords = (text: string) => {
+    return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+  };
+
   const handleCreateStatus = async () => {
     if (!newStatusContent.trim() && selectedImages.length === 0) {
       toast.error('Please add some content or images');
       return;
+    }
+
+    // Check word limit when images are present
+    if (selectedImages.length > 0 && !!newStatusContent.trim()) {
+      const wordCount = countWords(newStatusContent);
+      if (wordCount > 30) {
+        toast.error('Caption must be 30 words or less when images are uploaded');
+        return;
+      }
     }
 
     setIsPosting(true);
@@ -681,14 +695,18 @@ export default function StatusPage() {
       </div>
 
       {/* Floating Add Button */}
-      <button
-        onClick={() => setShowCreateModal(true)}
-        className="fixed bottom-24 right-6 w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition z-20"
-      >
-        <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-      </button>
+      <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 w-full max-w-md px-6 pointer-events-none z-20">
+        <div className="flex justify-end pointer-events-auto">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition"
+          >
+            <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+        </div>
+      </div>
 
       {/* Create Status Modal */}
       {showCreateModal && (
@@ -697,7 +715,7 @@ export default function StatusPage() {
           onClick={() => setShowCreateModal(false)}
         >
           <div 
-            className="bg-white rounded-3xl max-w-2xl w-full p-6"
+            className="bg-white rounded-3xl max-w-md w-full p-6"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -714,12 +732,27 @@ export default function StatusPage() {
             </div>
 
             {/* Content Editor */}
-            <textarea
-              value={newStatusContent}
-              onChange={(e) => setNewStatusContent(e.target.value)}
-              className="w-full bg-gray-50 text-black rounded-2xl p-4 mb-4 min-h-[200px] focus:outline-none focus:ring-2 focus:ring-gray-300 resize-none text-base"
-              placeholder="What's on your mind?"
-            />
+            <div className="mb-4">
+              <textarea
+                value={newStatusContent}
+                onChange={(e) => setNewStatusContent(e.target.value)}
+                className="w-full bg-gray-50 text-black rounded-2xl p-4 min-h-[200px] focus:outline-none focus:ring-2 focus:ring-gray-300 resize-none text-base"
+                placeholder="What's on your mind?"
+              />
+              {/* Word count indicator when images are present */}
+              {selectedImages.length > 0 && !!newStatusContent.trim() && (
+                <div className="flex justify-between items-center mt-2 px-2">
+                  <span className={`text-sm ${
+                    countWords(newStatusContent) > 30 ? 'text-red-500' : 'text-gray-500'
+                  }`}>
+                    {countWords(newStatusContent)}/30 words
+                  </span>
+                  {countWords(newStatusContent) > 30 && (
+                    <span className="text-red-500 text-sm">Caption too long for images</span>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Image Previews */}
             {imagePreviewUrls.length > 0 && (
@@ -764,7 +797,11 @@ export default function StatusPage() {
 
               <button
                 onClick={handleCreateStatus}
-                disabled={isPosting || (!newStatusContent.trim() && selectedImages.length === 0)}
+                disabled={
+                  isPosting || 
+                  (!newStatusContent.trim() && selectedImages.length === 0) ||
+                  (selectedImages.length > 0 && !!newStatusContent.trim() && countWords(newStatusContent) > 30)
+                }
                 className="bg-gray-600 text-white px-8 py-3 rounded-full font-semibold hover:bg-gray-700 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isPosting ? (
@@ -1040,6 +1077,7 @@ export default function StatusPage() {
       <EditRepostModal
         isOpen={showRepostModal}
         status={getCurrentStatus()}
+        theme={theme}
         initialContent={getCurrentStatus()?.content}
         onClose={() => setShowRepostModal(false)}
         onSuccess={() => {

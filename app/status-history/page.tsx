@@ -99,6 +99,14 @@ export default function StatusHistoryPage() {
     return date.toLocaleDateString();
   };
 
+  // Check if status is older than 24 hours (disappeared from feeds)
+  const isStatusOlderThan24Hours = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    return date < twentyFourHoursAgo;
+  };
+
   const handleDeleteStatus = async (statusId: string) => {
     if (!confirm('Are you sure you want to delete this status?')) return;
     
@@ -287,35 +295,37 @@ export default function StatusHistoryPage() {
                         </div>
                       </div>
 
-                      {/* Buttons */}
-                      <div className="space-y-2">
-                        <button
-                          onClick={() => handleRepostNow(status)}
-                          className={`w-full py-2 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
-                            theme === 'light'
-                              ? 'bg-gray-600 text-white hover:bg-gray-700'
-                              : 'bg-white/20 text-white hover:bg-white/30'
-                          }`}
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4" />
-                          </svg>
-                          Repost
-                        </button>
-                        <button
-                          onClick={() => handleEditRepost(status)}
-                          className={`w-full py-2 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
-                            theme === 'light'
-                              ? 'bg-blue-600 text-white hover:bg-blue-700'
-                              : 'bg-blue-500/30 text-blue-300 hover:bg-blue-500/40'
-                          }`}
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                          Edit & Repost
-                        </button>
-                      </div>
+                      {/* Buttons - Only show if status is older than 24 hours (disappeared from feeds) */}
+                      {isStatusOlderThan24Hours(status.createdAt) && (
+                        <div className="space-y-2">
+                          <button
+                            onClick={() => handleRepostNow(status)}
+                            className={`w-full py-2 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
+                              theme === 'light'
+                                ? 'bg-gray-600 text-white hover:bg-gray-700'
+                                : 'bg-white/20 text-white hover:bg-white/30'
+                            }`}
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4" />
+                            </svg>
+                            Repost
+                          </button>
+                          <button
+                            onClick={() => handleEditRepost(status)}
+                            className={`w-full py-2 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
+                              theme === 'light'
+                                ? 'bg-black/20 text-white hover:bg-black/30'
+                                : 'bg-white/20 text-white hover:bg-white/30'
+                            }`}
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Edit & Repost
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -338,6 +348,7 @@ export default function StatusHistoryPage() {
       <EditRepostModal
         isOpen={showRepostModal}
         status={selectedStatus}
+        theme={theme}
         onClose={() => {
           setShowRepostModal(false);
           setSelectedStatus(null);

@@ -43,6 +43,7 @@ interface Conversation {
   };
   unreadCount: number;
   lastActivity: string;
+  hasUrgentMessage?: boolean; // New field for urgent/important messages
 }
 
 interface Follower {
@@ -344,6 +345,21 @@ export default function ChatsPage() {
   
   console.log('🔄 ChatsPage RENDER');
   
+  // Check if we navigated here via browser back button and force reload
+  useEffect(() => {
+    const checkForBackNavigation = () => {
+      // Check if we came from a chat page (stored in sessionStorage)
+      const cameFromChat = sessionStorage.getItem('cameFromChat');
+      if (cameFromChat === 'true') {
+        sessionStorage.removeItem('cameFromChat');
+        window.location.reload();
+        return;
+      }
+    };
+    
+    checkForBackNavigation();
+  }, []);
+  
   // Read tab from URL parameter, default to 'chats'
   const getInitialTab = (): 'chats' | 'channels' | 'broadcasts' => {
     if (typeof window !== 'undefined') {
@@ -375,7 +391,7 @@ export default function ChatsPage() {
     checkUrlTab();
   }, []);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
-  const [followers, setFollowers] = useState<Follower[]>([]);
+  const [following, setFollowing] = useState<Follower[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [activeUsers, setActiveUsers] = useState<{ [conversationId: string]: { [participantId: string]: boolean } }>({});
@@ -461,11 +477,30 @@ export default function ChatsPage() {
         registerChatsPageStatus(false);
       } else {
         registerChatsPageStatus(true);
+        // Refresh conversations when page becomes visible again
+        fetchConversations();
       }
+    };
+
+    // Handle window focus - refresh conversations when user returns to the page
+    const handleWindowFocus = () => {
+      fetchConversations();
+    };
+
+    // Handle browser back/forward navigation to chats page
+    const handlePopState = () => {
+      // Small delay to ensure the navigation has completed
+      setTimeout(() => {
+        if (window.location.pathname === '/chats') {
+          window.location.reload();
+        }
+      }, 100);
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener('popstate', handlePopState);
 
     // Set up polling to refresh conversations and check active users every 10 seconds
     const interval = setInterval(() => {
@@ -482,6 +517,8 @@ export default function ChatsPage() {
       registerChatsPageStatus(false);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener('popstate', handlePopState);
       if (interval) {
         clearInterval(interval);
       }
@@ -680,13 +717,13 @@ export default function ChatsPage() {
     }
   };
 
-  const fetchFollowers = async () => {
+  const fetchFollowing = async () => {
     try {
-      const response = await api.get('/follows/followers');
-      setFollowers(response.data.followers || []);
+      const response = await api.get('/follows/following');
+      setFollowing(response.data.following || []);
     } catch (error) {
-      console.error('Failed to fetch followers:', error);
-      toast.error('Failed to load followers');
+      console.error('Failed to fetch following:', error);
+      toast.error('Failed to load following');
     }
   };
 
@@ -731,7 +768,7 @@ export default function ChatsPage() {
   };
 
   const handleOpenNewChat = async () => {
-    await fetchFollowers();
+    await fetchFollowing();
     setSelectedUsers([]);
     setShowNewChatModal(true);
   };
@@ -762,10 +799,10 @@ export default function ChatsPage() {
     }
   }, [activeTab]);
 
-  const filteredFollowers = followers.filter(follower =>
-    follower.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    follower.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    follower.username?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredFollowing = following.filter(user =>
+    user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.username?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Helper function to detect and render links in broadcast messages
@@ -981,6 +1018,14 @@ export default function ChatsPage() {
                         );
                       }
                     })
+                    .sort((a, b) => {
+                      // First priority: urgent messages
+                      if (a.hasUrgentMessage && !b.hasUrgentMessage) return -1;
+                      if (!a.hasUrgentMessage && b.hasUrgentMessage) return 1;
+                      
+                      // Second priority: last activity time
+                      return new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime();
+                    })
                     .map((conversation) => {
                     // For group chats, check if any participant is active
                     const isAnyParticipantActive = conversation.isGroup 
@@ -1058,8 +1103,9 @@ export default function ChatsPage() {
                               className="w-12 h-12 rounded-full object-cover"
                             />
                           )}
-                          {isAnyParticipantActive && (
-                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-black"></div>
+                          {/* Priority indicator: Only show gold dot for urgent messages */}
+                          {conversation.hasUrgentMessage && (
+                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-yellow-500 rounded-full border-2 border-black"></div>
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1623,37 +1669,37 @@ export default function ChatsPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4">
-              {filteredFollowers.length === 0 ? (
+              {filteredFollowing.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-sm text-gray-500">No followers found</p>
+                  <p className="text-sm text-gray-500">No following found</p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {filteredFollowers.map((follower) => (
+                  {filteredFollowing.map((user) => (
                     <div
-                      key={follower._id}
-                      onClick={() => toggleUserSelection(follower._id)}
+                      key={user._id}
+                      onClick={() => toggleUserSelection(user._id)}
                       className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-100 cursor-pointer transition"
                     >
                       <Image
-                        src={follower.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
-                        alt={follower.name}
+                        src={user.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
+                        alt={user.name}
                         width={40}
                         height={40}
                         className="w-10 h-10 rounded-full object-cover"
                       />
                       <div className="flex-1">
-                        <h3 className="font-semibold text-black">{follower.displayName || follower.name}</h3>
-                        {follower.username && (
-                          <p className="text-sm text-gray-500">@{follower.username}</p>
+                        <h3 className="font-semibold text-black">{user.displayName || user.name}</h3>
+                        {user.username && (
+                          <p className="text-sm text-gray-500">@{user.username}</p>
                         )}
                       </div>
                       <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
-                        selectedUsers.includes(follower._id) 
+                        selectedUsers.includes(user._id) 
                           ? 'bg-black border-black' 
                           : 'border-gray-300'
                       }`}>
-                        {selectedUsers.includes(follower._id) && (
+                        {selectedUsers.includes(user._id) && (
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                           </svg>

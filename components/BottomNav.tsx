@@ -1,28 +1,62 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
+import api from '@/lib/api';
 
 export default function BottomNav() {
   const router = useRouter();
   const pathname = usePathname();
+  const [hasUrgentMessages, setHasUrgentMessages] = useState(false);
 
   const isActive = (path: string) => {
     return pathname === path;
   };
 
   const handleChatNavigation = () => {
-    if (pathname === '/chats' || pathname?.startsWith('/chat/')) {
-      // If already on a chat page, reload the window
-      window.location.href = '/chats';
-    } else {
-      // If coming from another page, navigate normally but reload
-      router.push('/chats');
-      setTimeout(() => {
-        window.location.reload();
-      }, 100);
-    }
+    // Always use window.location.href to force a full page reload
+    window.location.href = '/chats';
   };
+
+  // Check for urgent messages
+  useEffect(() => {
+    const checkUrgentMessages = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        const response = await api.get('/chat/conversations');
+        const conversations = response.data || [];
+        
+        // Check if any conversation has urgent messages
+        const hasUrgent = conversations.some((conv: any) => conv.hasUrgentMessage === true);
+        setHasUrgentMessages(hasUrgent);
+      } catch (error) {
+        console.error('Failed to check urgent messages:', error);
+      }
+    };
+
+    // Check immediately
+    checkUrgentMessages();
+
+    // Check every 30 seconds for urgent messages
+    const interval = setInterval(checkUrgentMessages, 30000);
+
+    // Check when page becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        checkUrgentMessages();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   return (
     <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-md bg-black/60 backdrop-blur-xl border-t border-white/10 z-30">
@@ -61,13 +95,19 @@ export default function BottomNav() {
         
         <button 
           onClick={handleChatNavigation}
-          className={`flex flex-col items-center gap-1 ${
+          className={`flex flex-col items-center gap-1 relative ${
             isActive('/chats') || pathname?.startsWith('/chat/') ? 'text-white' : 'text-gray-400 hover:text-white'
           }`}
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
+          <div className="relative">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            {/* Urgent message indicator */}
+            {hasUrgentMessages && (
+              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-yellow-500 rounded-full border border-black"></div>
+            )}
+          </div>
           <span className="text-xs">Chats</span>
         </button>
         
@@ -90,7 +130,7 @@ export default function BottomNav() {
           }`}
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 11-2 0z" />
           </svg>
           <span className="text-xs">More</span>
         </button>
