@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import api from '@/lib/api';
+import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 
 export default function BottomNav() {
   const router = useRouter();
@@ -138,9 +139,7 @@ export default function BottomNav() {
             isActive('/more') ? 'text-white' : 'text-gray-400 hover:text-white'
           }`}
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 11-2 0z" />
-          </svg>
+          <MoreHorizIcon className="w-6 h-6" />
           <span className="text-xs">More</span>
         </button>
       </div>
