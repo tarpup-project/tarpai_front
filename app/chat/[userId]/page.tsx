@@ -87,6 +87,9 @@ export default function ChatPage() {
   const [publicUserMessage, setPublicUserMessage] = useState('');
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [loginPassword, setLoginPassword] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -283,9 +286,99 @@ export default function ChatPage() {
       setEmailSent(true);
     } catch (error: any) {
       console.error('Failed to create pending user:', error);
-      toast.error(error.response?.data?.message || 'Failed to send verification email');
+      
+      // If email already exists, show password modal instead
+      if (error.response?.data?.message?.includes('already exists') || 
+          error.response?.data?.message?.includes('Email already')) {
+        setShowPasswordModal(true);
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to send verification email');
+      }
     } finally {
       setIsCreatingAccount(false);
+    }
+  };
+
+  const handlePasswordLogin = async () => {
+    if (!loginPassword.trim()) {
+      toast.error('Please enter your password');
+      return;
+    }
+
+    setIsLoggingIn(true);
+
+    try {
+      // Login with email and password
+      const response = await publicApi.post('/auth/login', {
+        email: publicUserEmail,
+        password: loginPassword,
+      });
+
+      if (response.data.token) {
+        // User logged in successfully
+        const setAuth = useAuthStore.getState().setAuth;
+        setAuth(response.data.user, response.data.token);
+        
+        // Close password modal
+        setShowPasswordModal(false);
+        
+        // Show success message
+        toast.success('Logged in successfully!');
+        
+        // Store the message to send after login
+        const messageToSend = publicUserMessage;
+        
+        // Reset public form states
+        setPublicUserName('');
+        setPublicUserEmail('');
+        setPublicUserMessage('');
+        setLoginPassword('');
+        setShowPublicForm(false);
+        setIsPublicChat(false);
+        
+        // Initialize authenticated chat and send the message
+        try {
+          // Create or get conversation with the chat user
+          const conversationResponse = await api.post('/chat/conversations', {
+            participantId: chatUser?._id,
+          });
+          
+          const conversationId = conversationResponse.data.id;
+          
+          // Send the message that was entered in the public form
+          if (messageToSend.trim()) {
+            await api.post(`/chat/conversations/${conversationId}/messages`, {
+              content: messageToSend,
+              type: 'text',
+            });
+            
+            toast.success('Message sent successfully!');
+          }
+          
+          // Refresh the page to initialize authenticated chat properly
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+          
+        } catch (messageError) {
+          console.error('Failed to send message after login:', messageError);
+          toast.error('Logged in successfully, but failed to send message. Please try again.');
+          
+          // Still refresh the page even if message sending failed
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        }
+      }
+    } catch (error: any) {
+      console.error('Failed to login:', error);
+      if (error.response?.status === 401) {
+        toast.error('Invalid password. Please try again.');
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to login');
+      }
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -1068,6 +1161,103 @@ export default function ChatPage() {
             )}
           </div>
         </div>
+
+        {/* Password Modal */}
+        {showPasswordModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center px-6" onClick={() => {
+            setShowPasswordModal(false);
+            setLoginPassword('');
+          }}>
+            <div className="bg-white rounded-2xl p-8 w-full max-w-md relative" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => {
+                  setShowPasswordModal(false);
+                  setLoginPassword('');
+                }}
+                className="absolute top-6 right-6 text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+
+              <div className="space-y-4">
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl font-bold text-black mb-2">Welcome back!</h2>
+                  <p className="text-gray-600">Enter your password to continue</p>
+                  <p className="text-sm text-gray-500 mt-2">{publicUserEmail}</p>
+                </div>
+
+                <div>
+                  <label htmlFor="loginPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                    Password
+                  </label>
+                  <input
+                    id="loginPassword"
+                    type="password"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="w-full bg-gray-100 border border-gray-300 text-black rounded-lg px-4 py-3 focus:outline-none focus:border-gray-400"
+                    placeholder="Enter your password"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handlePasswordLogin();
+                      }
+                    }}
+                  />
+                </div>
+
+                <button
+                  onClick={handlePasswordLogin}
+                  disabled={isLoggingIn}
+                  className="w-full bg-pink-500 text-white hover:bg-pink-600 py-3 rounded-full font-semibold transition disabled:opacity-50"
+                >
+                  {isLoggingIn ? 'Logging in...' : 'Login'}
+                </button>
+
+                <div className="flex items-center my-4">
+                  <div className="flex-1 border-t border-gray-300"></div>
+                  <span className="px-3 text-sm text-gray-500">or</span>
+                  <div className="flex-1 border-t border-gray-300"></div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    // Store the context in localStorage before redirecting to Google OAuth
+                    const context = {
+                      action: 'chat',
+                      recipientId: userId,
+                      messageContent: publicUserMessage,
+                      returnUrl: window.location.pathname
+                    };
+                    localStorage.setItem('googleOAuthContext', JSON.stringify(context));
+                    
+                    // Redirect to Google OAuth on the backend server
+                    window.location.href = 'http://localhost:3000/auth/google';
+                  }}
+                  className="w-16 h-16 mx-auto bg-white border-2 border-gray-300 rounded-full flex items-center justify-center hover:border-gray-400 transition shadow-sm"
+                >
+                  <svg className="w-8 h-8" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                </button>
+
+                <div className="text-center">
+                  <button
+                    onClick={() => {
+                      setShowPasswordModal(false);
+                      setLoginPassword('');
+                    }}
+                    className="text-sm text-gray-600 hover:text-gray-800"
+                  >
+                    ← Back
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1224,7 +1414,20 @@ export default function ChatPage() {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((message) => {
+          {messages.length === 0 && !isPublicChat && chatUser ? (
+            /* Empty state for authenticated users */
+            <div className="flex-1 flex items-center justify-center h-full">
+              <div className="text-center px-6">
+                <h1 className={`text-2xl font-bold mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+                  Link up with
+                </h1>
+                <h2 className={`text-2xl font-bold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+                  {chatUser.displayName || chatUser.name} using <span className="text-pink-500">AI</span>
+                </h2>
+              </div>
+            </div>
+          ) : (
+            messages.map((message) => {
             const isOwn = message.sender === currentUser?.id;
             const isHighlighted = highlightedMessageId === message._id;
             const isSelected = selectedMessages.has(message._id);
@@ -1441,7 +1644,8 @@ export default function ChatPage() {
                 </div>
               </div>
             );
-          })}
+          })
+          )}
           <div ref={messagesEndRef} />
         </div>
 
