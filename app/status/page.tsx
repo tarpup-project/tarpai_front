@@ -12,6 +12,7 @@ import AppHeader from '@/components/AppHeader';
 import BottomNav from '@/components/BottomNav';
 import ImageCropper from '@/components/ImageCropper';
 import EditRepostModal from '@/components/EditRepostModal';
+import LikesModal from '@/components/LikesModal';
 
 interface Status {
   id: string;
@@ -80,6 +81,9 @@ export default function StatusPage() {
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const [currentCroppingIndex, setCurrentCroppingIndex] = useState<number | null>(null);
   const [currentFileToAdd, setCurrentFileToAdd] = useState<File | null>(null);
+  const [showLikesModal, setShowLikesModal] = useState(false);
+  const [selectedStatusForLikes, setSelectedStatusForLikes] = useState<string | null>(null);
+  const [selectedStatusLikesCount, setSelectedStatusLikesCount] = useState(0);
 
   // Check authentication immediately using localStorage
   useEffect(() => {
@@ -170,6 +174,25 @@ export default function StatusPage() {
 
   const handleLike = async (statusId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    
+    // Find the status to check if user is the author
+    let targetStatus: Status | null = null;
+    for (const group of statuses) {
+      const found = group.statuses.find(s => s.id === statusId);
+      if (found) {
+        targetStatus = found;
+        break;
+      }
+    }
+    
+    // If user is the author, show likes modal instead of liking
+    if (targetStatus && targetStatus.author._id === user?.id) {
+      setSelectedStatusForLikes(statusId);
+      setSelectedStatusLikesCount(targetStatus.likesCount);
+      setShowLikesModal(true);
+      return;
+    }
+    
     try {
       await api.post(`/status/${statusId}/like`);
       
@@ -1095,6 +1118,14 @@ export default function StatusPage() {
           aspect={4 / 3}
         />
       )}
+
+      {/* Likes Modal */}
+      <LikesModal
+        isOpen={showLikesModal}
+        onClose={() => setShowLikesModal(false)}
+        statusId={selectedStatusForLikes || ''}
+        likesCount={selectedStatusLikesCount}
+      />
     </div>
   );
 }

@@ -1091,6 +1091,8 @@ export default function ChatsPage() {
             >
               Messages
             </button>
+            {/* Channels Tab - Commented Out */}
+            {/*
             <button
               onClick={() => handleTabSwitch('channels')}
               className={`flex-1 py-2 px-4 rounded-full font-medium transition ${
@@ -1105,6 +1107,7 @@ export default function ChatsPage() {
             >
               Channels
             </button>
+            */}
             <button
               onClick={() => handleTabSwitch('broadcasts')}
               className={`flex-1 py-2 px-4 rounded-full font-medium transition ${
@@ -1281,9 +1284,10 @@ export default function ChatsPage() {
             </div>
           )}
 
+          {/* Channels Tab Content - Commented Out */}
+          {/*
           {activeTab === 'channels' && (
             <div>
-              {/* Create New Channel Button */}
               <div 
                 onClick={() => setShowCreateChannelModal(true)}
                 className={`${theme === 'light' ? 'bg-white/30 border-black/10' : 'bg-white/10 border-white/30'} backdrop-blur-md border rounded-2xl p-4 flex items-center gap-4 ${theme === 'light' ? 'hover:bg-white/20' : 'hover:bg-white/20'} transition cursor-pointer mb-6`}
@@ -1301,7 +1305,6 @@ export default function ChatsPage() {
                 </div>
               </div>
 
-              {/* Your Channels Section */}
               <div className="mb-6">
                 <h3 className={`text-lg font-semibold mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>YOUR CHANNELS</h3>
                 {channels.filter(channel => channel.owner._id === currentUser?.id).length === 0 ? (
@@ -1353,7 +1356,6 @@ export default function ChatsPage() {
                 )}
               </div>
 
-              {/* All Channels Section */}
               <div>
                 <h3 className={`text-lg font-semibold mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>ALL CHANNELS</h3>
                 {channels.length === 0 ? (
@@ -1409,6 +1411,7 @@ export default function ChatsPage() {
               </div>
             </div>
           )}
+          */}
 
           {activeTab === 'broadcasts' && (
             <div>
