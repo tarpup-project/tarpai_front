@@ -18,10 +18,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: '#0f1419' }}>
-          <div className="w-full max-w-md shadow-2xl">
-            {children}
-          </div>
+        <div className="min-h-screen w-full">
+          {children}
         </div>
         <Toaster position="top-right" />
       </body>

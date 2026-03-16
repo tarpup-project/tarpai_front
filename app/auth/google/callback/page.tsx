@@ -20,11 +20,22 @@ function GoogleCallbackContent() {
         const user = JSON.parse(decodeURIComponent(userStr));
         setAuth(user, token);
         
+        // Check if user needs to complete profile setup (always redirect new Google users to setup-profile)
+        // We'll assume Google users should always go through setup-profile for username customization
+        const isNewGoogleUser = !localStorage.getItem('hasCompletedSetup_' + user.id);
+        
         // Check if there's a stored context from the OAuth flow
         const contextStr = localStorage.getItem('googleOAuthContext');
         if (contextStr) {
           const context = JSON.parse(contextStr);
           localStorage.removeItem('googleOAuthContext'); // Clean up
+          
+          // If user is new, redirect to setup-profile first
+          if (isNewGoogleUser) {
+            toast.success('Welcome! Please complete your profile setup.');
+            router.push('/setup-profile');
+            return;
+          }
           
           // Perform the pending action
           if (context.action === 'follow' && context.profileUserId) {
@@ -41,8 +52,14 @@ function GoogleCallbackContent() {
             router.push(context.returnUrl || '/dashboard');
           }
         } else {
-          toast.success('Successfully signed in with Google!');
-          router.push('/dashboard');
+          // No stored context - check if new user needs profile setup
+          if (isNewGoogleUser) {
+            toast.success('Welcome! Please complete your profile setup.');
+            router.push('/setup-profile');
+          } else {
+            toast.success('Successfully signed in with Google!');
+            router.push('/dashboard');
+          }
         }
       } catch (error) {
         toast.error('Failed to process Google sign in');
