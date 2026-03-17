@@ -13,6 +13,7 @@ import BottomNav from '@/components/BottomNav';
 import LinkIcon from '@/components/LinkIcon';
 import PasswordModal from '@/components/PasswordModal';
 import api from '@/lib/api';
+import { getBackgroundStyle, getTextColorClass } from '@/config/theme.config';
 
 interface Link {
   _id: string;
@@ -478,62 +479,6 @@ export default function UsernamePage() {
     }
   };
 
-  const handlePasswordLogin = async () => {
-    if (!loginPassword.trim()) {
-      toast.error('Please enter your password');
-      return;
-    }
-
-    const currentPendingAction = pendingAction;
-    setIsLoggingIn(true);
-
-    try {
-      // Login with email and password
-      const response = await publicApi.post('/auth/login', {
-        email: signupEmail,
-        password: loginPassword,
-      });
-
-      if (response.data.token) {
-        // User logged in successfully
-        setAuth(response.data.user, response.data.token);
-        
-        // Close modal
-        setShowPasswordModal(false);
-        
-        // Perform the pending action if any
-        if (currentPendingAction === 'follow') {
-          try {
-            await api.post(`/users/${profileUser?._id || profileUser?.id}/follow`);
-            toast.success('Logged in and followed successfully!');
-          } catch (followError) {
-            toast.success('Logged in successfully!');
-          }
-        } else {
-          toast.success('Logged in successfully!');
-        }
-        
-        // Reset states
-        setPendingAction(null);
-        setSignupName('');
-        setSignupEmail('');
-        setLoginPassword('');
-        
-        // Refresh the page to update the UI
-        window.location.reload();
-      }
-    } catch (error: any) {
-      console.error('Failed to login:', error);
-      if (error.response?.status === 401) {
-        toast.error('Invalid password. Please try again.');
-      } else {
-        toast.error(error.response?.data?.message || 'Failed to login');
-      }
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -548,36 +493,16 @@ export default function UsernamePage() {
 
   return (
     <div 
-        className={`min-h-screen relative overflow-hidden ${
-          theme === 'dark' ? 'text-white' : 'text-black'
-        }`}
-        style={
-          theme === 'dark'
-            ? {
-                background: '#000000',
-              }
-            : theme === 'light'
-            ? {
-                background: '#e6e6e6',
-              }
-            : {
-                background: background 
-                  ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${background})`
-                  : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-                backgroundAttachment: 'fixed',
-              }
-        }
+      className={`min-h-screen relative overflow-hidden ${getTextColorClass(theme)}`}
+      style={getBackgroundStyle(theme, background)}
     >
-      {/* Overlay for better text readability */}
+      {/* Overlay for better text readability - only for background theme */}
       {theme === 'background' && (
         <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"></div>
       )}
 
-      {/* Content */}
-      <div className="relative z-10 min-h-screen flex flex-col">
+          {/* Content */}
+          <div className="relative z-10 flex flex-col">
         {/* Top Icons */}
         <div className="flex justify-between items-start p-6">
           <button 
@@ -1092,10 +1017,10 @@ export default function UsernamePage() {
         <BottomNav />
       ) : (
         /* Home button for non-logged-in users */
-        <div className="fixed bottom-6 right-6 z-50">
+        <div className="p-4 flex justify-center">
           <button
             onClick={() => router.push('/')}
-            className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 ${
+            className={`w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 ${
               theme === 'light'
                 ? 'bg-white text-black border-2 border-gray-300'
                 : 'bg-white/90 text-black'

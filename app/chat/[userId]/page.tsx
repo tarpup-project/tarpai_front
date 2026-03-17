@@ -298,88 +298,6 @@ export default function ChatPage() {
     }
   };
 
-  const handlePasswordLogin = async () => {
-    if (!loginPassword.trim()) {
-      toast.error('Please enter your password');
-      return;
-    }
-
-    setIsLoggingIn(true);
-
-    try {
-      // Login with email and password
-      const response = await publicApi.post('/auth/login', {
-        email: publicUserEmail,
-        password: loginPassword,
-      });
-
-      if (response.data.token) {
-        // User logged in successfully
-        const setAuth = useAuthStore.getState().setAuth;
-        setAuth(response.data.user, response.data.token);
-        
-        // Close password modal
-        setShowPasswordModal(false);
-        
-        // Show success message
-        toast.success('Logged in successfully!');
-        
-        // Store the message to send after login
-        const messageToSend = publicUserMessage;
-        
-        // Reset public form states
-        setPublicUserName('');
-        setPublicUserEmail('');
-        setPublicUserMessage('');
-        setLoginPassword('');
-        setShowPublicForm(false);
-        setIsPublicChat(false);
-        
-        // Initialize authenticated chat and send the message
-        try {
-          // Create or get conversation with the chat user
-          const conversationResponse = await api.post('/chat/conversations', {
-            participantId: chatUser?._id,
-          });
-          
-          const conversationId = conversationResponse.data.id;
-          
-          // Send the message that was entered in the public form
-          if (messageToSend.trim()) {
-            await api.post(`/chat/conversations/${conversationId}/messages`, {
-              content: messageToSend,
-              type: 'text',
-            });
-            
-            toast.success('Message sent successfully!');
-          }
-          
-          // Refresh the page to initialize authenticated chat properly
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000);
-          
-        } catch (messageError) {
-          console.error('Failed to send message after login:', messageError);
-          toast.error('Logged in successfully, but failed to send message. Please try again.');
-          
-          // Still refresh the page even if message sending failed
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000);
-        }
-      }
-    } catch (error: any) {
-      console.error('Failed to login:', error);
-      if (error.response?.status === 401) {
-        toast.error('Invalid password. Please try again.');
-      } else {
-        toast.error(error.response?.data?.message || 'Failed to login');
-      }
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
 
   const initializeChat = async () => {
     try {
@@ -1203,7 +1121,7 @@ export default function ChatPage() {
             }
           : {
               background: background 
-                ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${background})`
+                ? `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url(${background})`
                 : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
@@ -1214,11 +1132,41 @@ export default function ChatPage() {
     >
       {/* Overlay for better text readability */}
       {theme === 'background' && (
-        <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div>
+        <div className="hidden md:block absolute inset-0 bg-black/20 backdrop-blur-md"></div>
       )}
 
-      {/* Content */}
-      <div className="relative z-10 flex flex-col h-screen">
+      {/* Phone container with blur effect */}
+      <div className="relative z-10 flex items-start justify-center min-h-screen w-full">
+        {/* Blurred background edges (phone frame effect) - hidden on mobile */}
+        <div 
+          className="hidden md:block absolute inset-0 backdrop-blur-xl"
+          style={{ 
+            maskImage: 'radial-gradient(white 30%, transparent 70%)',
+            WebkitMaskImage: 'radial-gradient(white 30%, transparent 70%)'
+          }}
+        />
+        
+        {/* Phone container - full width on mobile */}
+        <div 
+          className={`relative w-full md:max-w-md h-screen md:h-[calc(100vh-2rem)] md:my-4 mx-0 md:mx-4 rounded-none md:rounded-3xl overflow-hidden flex flex-col ${
+            theme === 'light' 
+              ? 'bg-white/90 shadow-2xl' 
+              : theme === 'dark'
+              ? 'bg-black/80 shadow-2xl'
+              : 'bg-black/30 backdrop-blur-md shadow-2xl'
+          }`}
+          style={{ 
+            ...(theme === 'background' && background ? {
+              backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)), url(${background})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            } : {})
+          }}
+        >
+          {/* Scrollable content area */}
+          <div className="flex-1 overflow-y-auto">
+          {/* Content */}
+          <div className="relative z-10 flex flex-col h-screen min-h-0">
         {/* Header */}
         <div 
           className={`backdrop-blur-md border-b p-4 flex items-center gap-3 ${
@@ -1775,6 +1723,9 @@ export default function ChatPage() {
           </div>
         </div>
       )}
+    </div>
+    </div>
+    </div>
     </div>
   );
 }

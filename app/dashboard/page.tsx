@@ -550,15 +550,61 @@ export default function DashboardPage() {
   return (
     <div 
       className={`min-h-screen relative overflow-hidden ${getTextColorClass(theme)}`}
-      style={getBackgroundStyle(theme, background)}
+      style={{
+        ...(theme === 'dark' 
+          ? { background: '#000000' }
+          : theme === 'light'
+          ? { background: '#e6e6e6' }
+          : background
+          ? {
+              backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url(${background})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundAttachment: 'fixed',
+            }
+          : {
+              backgroundImage: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+            }),
+      }}
     >
       {/* Overlay for better text readability - only for background theme */}
       {theme === 'background' && (
-        <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"></div>
+        <div className="hidden md:block absolute inset-0 bg-black/20 backdrop-blur-md"></div>
       )}
 
-      {/* Content */}
-      <div className="relative z-10 min-h-screen flex flex-col">
+      {/* Phone container with blur effect */}
+      <div className="relative z-10 flex items-start justify-center min-h-screen w-full">
+        {/* Blurred background edges (phone frame effect) - hidden on mobile */}
+        <div 
+          className="hidden md:block absolute inset-0 backdrop-blur-xl"
+          style={{ 
+            maskImage: 'radial-gradient(white 30%, transparent 70%)',
+            WebkitMaskImage: 'radial-gradient(white 30%, transparent 70%)'
+          }}
+        />
+        
+        {/* Phone container - full width on mobile, phone size on desktop */}
+        <div 
+          className={`relative w-full md:max-w-md h-screen md:h-[calc(100vh-2rem)] md:my-4 mx-0 md:mx-4 rounded-none md:rounded-3xl overflow-hidden flex flex-col ${
+            theme === 'light' 
+              ? 'bg-white/90 shadow-2xl' 
+              : theme === 'dark'
+              ? 'bg-black/80 shadow-2xl'
+              : 'bg-black/30 backdrop-blur-md shadow-2xl'
+          }`}
+          style={{ 
+            ...(theme === 'background' && background ? {
+              backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)), url(${background})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            } : {})
+          }}
+        >
+          {/* Scrollable content area */}
+          <div className="flex-1 overflow-y-auto">
+          {/* Content */}
+          <div className="relative z-10 flex flex-col min-h-0">
         {/* Header */}
         <AppHeader />
 
@@ -727,6 +773,8 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
+        </div>
+
         </div>
 
         {/* Bottom Navigation */}
@@ -1591,6 +1639,8 @@ export default function DashboardPage() {
         avatarUrl={user.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
         altText={user.displayName || user.name}
       />
+    </div>
+    </div>
     </div>
   );
 }
