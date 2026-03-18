@@ -880,7 +880,15 @@ export default function ChatPage() {
           theme === 'dark' ? 'text-white' : 'text-black'
         }`}
         style={
-          theme === 'dark'
+          background
+            ? {
+                background: `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${background})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                backgroundAttachment: 'fixed',
+              }
+            : theme === 'dark'
             ? {
                 background: '#000000',
               }
@@ -889,122 +897,135 @@ export default function ChatPage() {
                 background: '#e6e6e6',
               }
             : {
-                background: background 
-                  ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${background})`
-                  : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-                backgroundAttachment: 'fixed',
+                background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
               }
         }
       >
         {/* Overlay for better text readability */}
-        {theme === 'background' && (
+        {background && (
           <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div>
         )}
 
-        {/* Content */}
-        <div className="relative z-10 flex flex-col h-screen">
-          {/* Header */}
+        {/* Phone container with blur effect */}
+        <div className="relative z-10 flex items-start justify-center min-h-screen w-full">
+          {/* Blurred background edges (phone frame effect) - hidden on mobile */}
           <div 
-            className={`backdrop-blur-md border-b p-4 flex items-center gap-3 ${
+            className="hidden md:block absolute inset-0 backdrop-blur-xl"
+            style={{ 
+              maskImage: 'radial-gradient(white 30%, transparent 70%)',
+              WebkitMaskImage: 'radial-gradient(white 30%, transparent 70%)'
+            }}
+          />
+          
+          {/* Phone container */}
+          <div 
+            className={`relative w-full md:max-w-md h-screen md:h-[calc(100vh-2rem)] md:my-4 mx-0 md:mx-4 rounded-none md:rounded-3xl overflow-hidden flex flex-col ${
               theme === 'light' 
-                ? 'border-gray-300' 
-                : 'border-white/10'
+                ? 'bg-white/90 shadow-2xl' 
+                : theme === 'dark'
+                ? 'bg-black/80 shadow-2xl'
+                : 'bg-black/30 backdrop-blur-md shadow-2xl'
             }`}
-            style={
-              theme === 'light'
-                ? {
-                    background: 'linear-gradient(to bottom, #4a4a4a, #2d2d2d)',
-                  }
-                : {
-                    background: 'rgba(0, 0, 0, 0.4)',
-                  }
-            }
           >
-            <button
-              onClick={() => {
-                sessionStorage.setItem('cameFromChat', 'true');
-                window.location.href = '/chats';
-              }}
-              className="text-gray-300 hover:text-white"
+            {/* Header */}
+            <div 
+              className={`backdrop-blur-md border-b p-4 flex items-center gap-3 ${
+                theme === 'light' 
+                  ? 'border-gray-300' 
+                  : 'border-white/10'
+              }`}
+              style={
+                theme === 'light'
+                  ? {
+                      background: 'linear-gradient(to bottom, #4a4a4a, #2d2d2d)',
+                    }
+                  : {
+                      background: 'rgba(0, 0, 0, 0.4)',
+                    }
+              }
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
+              <button
+                onClick={() => {
+                  sessionStorage.setItem('cameFromChat', 'true');
+                  window.location.href = '/chats';
+                }}
+                className="text-gray-300 hover:text-white"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
 
-            <Image
-              src={chatUser.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
-              alt={chatUser.name}
-              width={40}
-              height={40}
-              className="w-10 h-10 rounded-full object-cover"
-            />
+              <Image
+                src={chatUser.avatar || 'https://res.cloudinary.com/dhjzwncjf/image/upload/v1771255225/Screenshot_2026-02-16_at_4.20.04_pm_paes1n.png'}
+                alt={chatUser.name}
+                width={40}
+                height={40}
+                className="w-10 h-10 rounded-full object-cover"
+              />
 
-            <div className="flex-1 min-w-0">
-              <h2 className={`font-semibold truncate ${theme === 'light' ? 'text-white' : 'text-white'}`}>{chatUser.displayName || chatUser.name}</h2>
+              <div className="flex-1 min-w-0">
+                <h2 className={`font-semibold truncate ${theme === 'light' ? 'text-white' : 'text-white'}`}>{chatUser.displayName || chatUser.name}</h2>
+              </div>
+
+              <button 
+                onClick={() => window.location.href = '/login'}
+                className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-full text-sm font-medium transition"
+              >
+                Login
+              </button>
             </div>
 
-            <button 
-              onClick={() => window.location.href = '/login'}
-              className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-full text-sm font-medium transition"
-            >
-              Login
-            </button>
-          </div>
-
-          {/* Main Content */}
-          <div className="flex-1 flex flex-col justify-center px-6">
-            <div className="text-center mb-8">
-              <h1 className={`text-2xl font-bold mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
-                Link up with
-              </h1>
-              <h2 className={`text-2xl font-bold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
-                {chatUser.displayName || chatUser.name} using <span className="text-pink-500">AI</span>
-              </h2>
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col justify-center px-6">
+              <div className="text-center mb-8">
+                <h1 className={`text-2xl font-bold mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+                  Link up with
+                </h1>
+                <h2 className={`text-2xl font-bold ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+                  {chatUser.displayName || chatUser.name} using <span className="text-pink-500">AI</span>
+                </h2>
+              </div>
             </div>
-          </div>
 
-          {/* Bottom Form Container */}
-          <div className="p-6 pb-8">
-            {!emailSent ? (
-              <>
-                <div className={`rounded-2xl p-6 space-y-4 mb-4 ${
-                  theme === 'light' 
-                    ? 'bg-white/90 border border-gray-300' 
-                    : 'bg-white/10 backdrop-blur-md border border-white/20'
-                }`}>
-                  <div className="flex items-center gap-3">
-                    <svg className={`w-5 h-5 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    <input
-                      type="text"
-                      value={publicUserName}
-                      onChange={(e) => setPublicUserName(e.target.value)}
-                      placeholder="Enter your first name:"
-                      className={`flex-1 bg-transparent border-none outline-none text-base ${
-                        theme === 'light' ? 'text-gray-900 placeholder-gray-500' : 'text-white placeholder-gray-400'
-                      }`}
-                    />
-                  </div>
+            {/* Bottom Form Container */}
+            <div className="p-6 pb-8">
+              {!emailSent ? (
+                <>
+                  <div className={`rounded-2xl p-6 space-y-4 mb-4 ${
+                    theme === 'light' 
+                      ? 'bg-white/90 border border-gray-300' 
+                      : 'bg-white/10 backdrop-blur-md border border-white/20'
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      <svg className={`w-5 h-5 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      <input
+                        type="text"
+                        value={publicUserName}
+                        onChange={(e) => setPublicUserName(e.target.value)}
+                        placeholder="Enter your first name:"
+                        className={`flex-1 bg-transparent border-none outline-none text-base ${
+                          theme === 'light' ? 'text-gray-900 placeholder-gray-500' : 'text-white placeholder-gray-400'
+                        }`}
+                      />
+                    </div>
 
-                  <div className="flex items-center gap-3">
-                    <svg className={`w-5 h-5 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                    </svg>
-                    <input
-                      type="email"
-                      value={publicUserEmail}
-                      onChange={(e) => setPublicUserEmail(e.target.value)}
-                      placeholder="Enter your email"
-                      className={`flex-1 bg-transparent border-none outline-none text-base ${
-                        theme === 'light' ? 'text-gray-900 placeholder-gray-500' : 'text-white placeholder-gray-400'
-                      }`}
-                    />
-                  </div>
+                    <div className="flex items-center gap-3">
+                      <svg className={`w-5 h-5 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                      </svg>
+                      <input
+                        type="email"
+                        value={publicUserEmail}
+                        onChange={(e) => setPublicUserEmail(e.target.value)}
+                        placeholder="Enter your email"
+                        className={`flex-1 bg-transparent border-none outline-none text-base ${
+                          theme === 'light' ? 'text-gray-900 placeholder-gray-500' : 'text-white placeholder-gray-400'
+                        }`}
+                      />
+                    </div>
 
                   <div className="flex items-center gap-3 pt-4">
                     <textarea
@@ -1077,6 +1098,7 @@ export default function ChatPage() {
               </>
             )}
           </div>
+          </div>
         </div>
 
         {/* Password Modal */}
@@ -1111,7 +1133,15 @@ export default function ChatPage() {
         theme === 'dark' ? 'text-white' : 'text-black'
       }`}
       style={
-        theme === 'dark'
+        background
+          ? {
+              background: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url(${background})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundAttachment: 'fixed',
+            }
+          : theme === 'dark'
           ? {
               background: '#000000',
             }
@@ -1120,18 +1150,12 @@ export default function ChatPage() {
               background: '#e6e6e6',
             }
           : {
-              background: background 
-                ? `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url(${background})`
-                : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              backgroundAttachment: 'fixed',
+              background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
             }
       }
     >
       {/* Overlay for better text readability */}
-      {theme === 'background' && (
+      {background && (
         <div className="hidden md:block absolute inset-0 bg-black/20 backdrop-blur-md"></div>
       )}
 
@@ -1155,13 +1179,6 @@ export default function ChatPage() {
               ? 'bg-black/80 shadow-2xl'
               : 'bg-black/30 backdrop-blur-md shadow-2xl'
           }`}
-          style={{ 
-            ...(theme === 'background' && background ? {
-              backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)), url(${background})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-            } : {})
-          }}
         >
           {/* Scrollable content area */}
           <div className="flex-1 overflow-y-auto">
@@ -1388,26 +1405,35 @@ export default function ChatPage() {
                         }}
                       />
                       {message.content && message.content !== 'Image' && (
-                        <div className={`px-3 pb-2 ${isOwn ? 'text-black' : 'text-white'}`}>
-                          <p className="text-sm">{message.content}</p>
+                        <div className={`px-3 ${isOwn ? 'text-black' : 'text-white'}`}>
+                          <p className="text-sm whitespace-pre-wrap mb-1">{message.content}</p>
+                          <div className="flex justify-end">
+                            <span className={`text-xs whitespace-nowrap ${isOwn ? 'opacity-60' : 'opacity-70'}`}>
+                              {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
                         </div>
                       )}
-                      <div className={`px-3 pb-2 flex justify-end`}>
-                        <span className={`text-xs whitespace-nowrap ${isOwn ? 'opacity-60' : 'opacity-70'}`}>
-                          {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
+                      {(!message.content || message.content === 'Image') && (
+                        <div className={`px-3 pb-2 flex justify-end`}>
+                          <span className={`text-xs whitespace-nowrap ${isOwn ? 'opacity-60' : 'opacity-70'}`}>
+                            {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <>
                       {(() => {
                         const renderedContent = renderMessageContent(message.content, !!message.linkPreview);
                         return renderedContent ? (
-                          <div className="flex flex-wrap items-end gap-2">
-                            <p className="flex-1 min-w-0">{renderedContent}</p>
-                            <span className={`text-xs whitespace-nowrap ml-auto ${isOwn ? 'opacity-60' : 'opacity-70'}`}>
-                              {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
+                          <div>
+                            <p className="whitespace-pre-wrap mb-1">{renderedContent}</p>
+                            <div className="flex justify-end">
+                              <span className={`text-xs whitespace-nowrap ${isOwn ? 'opacity-60' : 'opacity-70'}`}>
+                                {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
                           </div>
                         ) : null;
                       })()}

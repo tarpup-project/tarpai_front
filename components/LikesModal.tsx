@@ -70,9 +70,9 @@ export default function LikesModal({ isOpen, onClose, statusId, likesCount }: Li
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end md:items-center md:justify-center" onClick={onClose}>
       <div 
-        className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
+        className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up md:rounded-3xl md:max-w-md md:mx-4"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

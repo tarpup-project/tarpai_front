@@ -494,15 +494,54 @@ export default function UsernamePage() {
   return (
     <div 
       className={`min-h-screen relative overflow-hidden ${getTextColorClass(theme)}`}
-      style={getBackgroundStyle(theme, background)}
+      style={
+        background
+          ? {
+              background: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url(${background})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundAttachment: 'fixed',
+            }
+          : theme === 'dark'
+          ? { background: '#000000' }
+          : theme === 'light'
+          ? { background: '#e6e6e6' }
+          : {
+              background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+            }
+      }
     >
-      {/* Overlay for better text readability - only for background theme */}
-      {theme === 'background' && (
-        <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"></div>
+      {/* Overlay for better text readability - only when background exists */}
+      {background && (
+        <div className="hidden md:block absolute inset-0 bg-black/20 backdrop-blur-md"></div>
       )}
 
+      {/* Phone container with blur effect */}
+      <div className="relative z-10 flex items-start justify-center min-h-screen w-full">
+        {/* Blurred background edges - hidden on mobile */}
+        <div 
+          className="hidden md:block absolute inset-0 backdrop-blur-xl"
+          style={{ 
+            maskImage: 'radial-gradient(white 30%, transparent 70%)',
+            WebkitMaskImage: 'radial-gradient(white 30%, transparent 70%)'
+          }}
+        />
+        
+        {/* Phone container */}
+        <div 
+          className={`relative w-full md:max-w-md h-screen md:h-[calc(100vh-2rem)] md:my-4 mx-0 md:mx-4 rounded-none md:rounded-3xl overflow-hidden flex flex-col ${
+            theme === 'light' 
+              ? 'bg-white/90 shadow-2xl' 
+              : theme === 'dark'
+              ? 'bg-black/80 shadow-2xl'
+              : 'bg-black/30 backdrop-blur-md shadow-2xl'
+          }`}
+        >
+          {/* Scrollable content area */}
+          <div className="flex-1 overflow-y-auto">
           {/* Content */}
-          <div className="relative z-10 flex flex-col">
+          <div className="relative z-10 flex flex-col min-h-0">
         {/* Top Icons */}
         <div className="flex justify-between items-start p-6">
           <button 
@@ -715,9 +754,9 @@ export default function UsernamePage() {
 
       {/* Followers Modal */}
       {showFollowersModal && (
-        <div className={`fixed inset-0 ${theme === 'light' ? 'bg-black/40' : 'bg-black/60'} backdrop-blur-sm z-[60] flex items-end`} onClick={() => setShowFollowersModal(false)}>
+        <div className={`fixed inset-0 ${theme === 'light' ? 'bg-black/40' : 'bg-black/60'} backdrop-blur-sm z-[60] flex items-end md:items-center md:justify-center`} onClick={() => setShowFollowersModal(false)}>
           <div 
-            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
+            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up md:rounded-3xl md:max-w-md md:mx-4"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -787,9 +826,9 @@ export default function UsernamePage() {
 
       {/* Following Modal */}
       {showFollowingModal && (
-        <div className={`fixed inset-0 ${theme === 'light' ? 'bg-black/40' : 'bg-black/60'} backdrop-blur-sm z-[60] flex items-end`} onClick={() => setShowFollowingModal(false)}>
+        <div className={`fixed inset-0 ${theme === 'light' ? 'bg-black/40' : 'bg-black/60'} backdrop-blur-sm z-[60] flex items-end md:items-center md:justify-center`} onClick={() => setShowFollowingModal(false)}>
           <div 
-            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
+            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up md:rounded-3xl md:max-w-md md:mx-4"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -1043,6 +1082,11 @@ export default function UsernamePage() {
           </button>
         </div>
       )}
+
+      </div>
+
+    </div>
+    </div>
     </div>
   );
 }

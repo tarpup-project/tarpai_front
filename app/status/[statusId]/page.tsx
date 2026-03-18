@@ -282,53 +282,6 @@ export default function StatusDetailPage() {
     }
   };
 
-  const handlePasswordLogin = async () => {
-    if (!loginPassword.trim()) {
-      toast.error('Please enter your password');
-      return;
-    }
-
-    setIsLoggingIn(true);
-
-    try {
-      const publicApi = (await import('@/lib/publicApi')).default;
-      const setAuth = useAuthStore.getState().setAuth;
-
-      // Login with email and password
-      const response = await publicApi.post('/auth/login', {
-        email: signupEmail,
-        password: loginPassword,
-      });
-
-      if (response.data.token) {
-        // User logged in successfully
-        setAuth(response.data.user, response.data.token);
-        
-        // Close modal
-        setShowPasswordModal(false);
-        
-        // Show success message
-        toast.success('Logged in successfully!');
-        
-        // Reset states
-        setSignupName('');
-        setSignupEmail('');
-        setLoginPassword('');
-        
-        // Refresh the page to update the UI
-        window.location.reload();
-      }
-    } catch (error: any) {
-      console.error('Failed to login:', error);
-      if (error.response?.status === 401) {
-        toast.error('Invalid password. Please try again.');
-      } else {
-        toast.error(error.response?.data?.message || 'Failed to login');
-      }
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -376,12 +329,42 @@ export default function StatusDetailPage() {
   }
 
   return (
-    <div
-      className="min-h-screen w-full max-w-md mx-auto relative"
-      style={{ background: '#e6e6e6' }}
+    <div 
+      className={`min-h-screen relative overflow-hidden ${
+        theme === 'light' ? 'text-black' : 'text-white'
+      }`}
+      style={{
+        ...(background ? {
+          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url(${background})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'fixed',
+        } : {
+          background: theme === 'dark' ? '#000000' : '#e6e6e6',
+        }),
+      }}
     >
-      {/* Check if status has images */}
-      {status.images && status.images.length > 0 ? (
+      {/* Blur overlay on desktop */}
+      <div className="hidden md:block absolute inset-0 bg-black/20 backdrop-blur-md"></div>
+
+      {/* Phone container */}
+      <div className="relative z-10 flex items-start justify-center min-h-screen w-full">
+        {/* Blurred background edges - hidden on mobile */}
+        <div 
+          className="hidden md:block absolute inset-0 backdrop-blur-xl"
+          style={{ 
+            maskImage: 'radial-gradient(white 30%, transparent 70%)',
+            WebkitMaskImage: 'radial-gradient(white 30%, transparent 70%)'
+          }}
+        />
+        
+        {/* Phone container - always white background */}
+        <div 
+          className="relative w-full md:max-w-md h-screen md:h-[calc(100vh-2rem)] md:my-4 mx-0 md:mx-4 rounded-none md:rounded-3xl overflow-hidden bg-white shadow-2xl"
+        >
+          {/* Check if status has images */}
+          {status.images && status.images.length > 0 ? (
         <>
           {/* Status Images - Centered for small, scrollable for tall */}
           <div className="absolute inset-0 overflow-y-auto overflow-x-hidden bg-white" style={{ paddingBottom: '100px' }}>
@@ -800,6 +783,8 @@ export default function StatusDetailPage() {
         statusId={statusId}
         likesCount={status?.likesCount || 0}
       />
+    </div>
+    </div>
     </div>
   );
 }

@@ -173,7 +173,15 @@ export default function StatusHistoryPage() {
         theme === 'light' ? 'text-black' : 'text-white'
       }`}
       style={
-        theme === 'light'
+        background
+          ? {
+              background: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url(${background})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundAttachment: 'fixed',
+            }
+          : theme === 'light'
           ? {
               background: '#e6e6e6',
             }
@@ -182,23 +190,40 @@ export default function StatusHistoryPage() {
               background: '#000000',
             }
           : {
-              background: background 
-                ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${background})`
-                : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              backgroundAttachment: 'fixed',
+              background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
             }
       }
     >
       {/* Overlay */}
-      {theme === 'background' && (
-        <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"></div>
+      {background && (
+        <div className="hidden md:block absolute inset-0 bg-black/20 backdrop-blur-md"></div>
       )}
 
-      {/* Content */}
-      <div className="relative z-10 min-h-screen flex flex-col">
+      {/* Phone container with blur effect */}
+      <div className="relative z-10 flex items-start justify-center min-h-screen w-full">
+        {/* Blurred background edges - hidden on mobile */}
+        <div 
+          className="hidden md:block absolute inset-0 backdrop-blur-xl"
+          style={{ 
+            maskImage: 'radial-gradient(white 30%, transparent 70%)',
+            WebkitMaskImage: 'radial-gradient(white 30%, transparent 70%)'
+          }}
+        />
+        
+        {/* Phone container */}
+        <div 
+          className={`relative w-full md:max-w-md h-screen md:h-[calc(100vh-2rem)] md:my-4 mx-0 md:mx-4 rounded-none md:rounded-3xl overflow-hidden flex flex-col ${
+            theme === 'light' 
+              ? 'bg-white/90 shadow-2xl' 
+              : theme === 'dark'
+              ? 'bg-black/80 shadow-2xl'
+              : 'bg-black/30 backdrop-blur-md shadow-2xl'
+          }`}
+        >
+          {/* Scrollable content area */}
+          <div className="flex-1 overflow-y-auto">
+          {/* Content */}
+          <div className="relative z-10 flex flex-col min-h-0">
         {/* Header */}
         <AppHeader />
 
@@ -340,6 +365,8 @@ export default function StatusHistoryPage() {
           </div>
         </div>
 
+        </div>
+
         {/* Bottom Navigation */}
         <BottomNav />
       </div>
@@ -357,6 +384,8 @@ export default function StatusHistoryPage() {
           fetchStatuses();
         }}
       />
+    </div>
+    </div>
     </div>
   );
 }

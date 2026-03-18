@@ -551,11 +551,7 @@ export default function DashboardPage() {
     <div 
       className={`min-h-screen relative overflow-hidden ${getTextColorClass(theme)}`}
       style={{
-        ...(theme === 'dark' 
-          ? { background: '#000000' }
-          : theme === 'light'
-          ? { background: '#e6e6e6' }
-          : background
+        ...(background 
           ? {
               backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url(${background})`,
               backgroundSize: 'cover',
@@ -563,13 +559,17 @@ export default function DashboardPage() {
               backgroundRepeat: 'no-repeat',
               backgroundAttachment: 'fixed',
             }
+          : theme === 'dark' 
+          ? { background: '#000000' }
+          : theme === 'light'
+          ? { background: '#e6e6e6' }
           : {
               backgroundImage: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
             }),
       }}
     >
-      {/* Overlay for better text readability - only for background theme */}
-      {theme === 'background' && (
+      {/* Overlay for better text readability - only when background exists */}
+      {background && (
         <div className="hidden md:block absolute inset-0 bg-black/20 backdrop-blur-md"></div>
       )}
 
@@ -593,13 +593,6 @@ export default function DashboardPage() {
               ? 'bg-black/80 shadow-2xl'
               : 'bg-black/30 backdrop-blur-md shadow-2xl'
           }`}
-          style={{ 
-            ...(theme === 'background' && background ? {
-              backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)), url(${background})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-            } : {})
-          }}
         >
           {/* Scrollable content area */}
           <div className="flex-1 overflow-y-auto">
@@ -1149,9 +1142,9 @@ export default function DashboardPage() {
 
       {/* Followers Modal */}
       {showFollowersModal && (
-        <div className={`fixed inset-0 ${theme === 'light' ? 'bg-black/40' : 'bg-black/60'} backdrop-blur-sm z-50 flex items-end`} onClick={() => setShowFollowersModal(false)}>
+        <div className={`fixed inset-0 ${theme === 'light' ? 'bg-black/40' : 'bg-black/60'} backdrop-blur-sm z-50 flex items-end md:items-center md:justify-center`} onClick={() => setShowFollowersModal(false)}>
           <div 
-            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
+            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up md:rounded-3xl md:max-w-md md:mx-4"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -1269,14 +1262,14 @@ export default function DashboardPage() {
 
       {/* Following Modal */}
       {showFollowingModal && (
-        <div className={`fixed inset-0 ${theme === 'light' ? 'bg-black/40' : 'bg-black/60'} backdrop-blur-sm z-50 flex items-end`} onClick={() => {
+        <div className={`fixed inset-0 ${theme === 'light' ? 'bg-black/40' : 'bg-black/60'} backdrop-blur-sm z-50 flex items-end md:items-center md:justify-center`} onClick={() => {
           setShowFollowingModal(false);
           setUsersLoaded(false);
           setSearchQuery('');
           setSearchUsers([]);
         }}>
           <div 
-            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up"
+            className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-slide-up md:rounded-3xl md:max-w-md md:mx-4"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -1488,9 +1481,9 @@ export default function DashboardPage() {
 
       {/* Broadcast Modal */}
       {showBroadcastModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end" onClick={() => setShowBroadcastModal(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end md:items-center md:justify-center" onClick={() => setShowBroadcastModal(false)}>
           <div 
-            className="bg-white rounded-t-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-slide-up"
+            className="bg-white rounded-t-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-slide-up md:rounded-3xl md:max-w-md md:mx-4"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

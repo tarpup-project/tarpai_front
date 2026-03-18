@@ -185,23 +185,25 @@ export default function TarpAIPage() {
         theme === 'dark' ? 'text-white' : 'text-black'
       }`}
       style={
-        theme === 'dark'
-          ? { background: '#000000' }
-          : theme === 'light'
-          ? { background: '#e6e6e6' }
-          : {
-              background: background
-                ? `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url(${background})`
-                : 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+        background
+          ? {
+              background: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url(${background})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
               backgroundAttachment: 'fixed',
             }
+          : theme === 'dark'
+          ? { background: '#000000' }
+          : theme === 'light'
+          ? { background: '#e6e6e6' }
+          : {
+              background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+            }
       }
     >
       {/* Overlay for better text readability */}
-      {theme === 'background' && (
+      {background && (
         <div className="hidden md:block absolute inset-0 bg-black/20 backdrop-blur-md"></div>
       )}
 
@@ -225,13 +227,6 @@ export default function TarpAIPage() {
               ? 'bg-black/80 shadow-2xl'
               : 'bg-black/30 backdrop-blur-md shadow-2xl'
           }`}
-          style={{ 
-            ...(theme === 'background' && background ? {
-              backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)), url(${background})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-            } : {})
-          }}
         >
           {/* Scrollable content area */}
           <div className="flex-1 overflow-y-auto">
