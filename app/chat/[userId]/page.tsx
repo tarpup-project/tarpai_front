@@ -21,6 +21,7 @@ interface Message {
   type?: string;
   fileUrl?: string;
   createdAt: string;
+  isAI?: boolean;
   linkPreview?: {
     url: string;
     title?: string;
@@ -442,6 +443,7 @@ export default function ChatPage() {
             type: message.type,
             fileUrl: message.fileUrl,
             createdAt: message.createdAt,
+            isAI: message.isAI || false,
             linkPreview: message.linkPreview,
             replyTo: message.replyTo ? {
               _id: message.replyTo.id,
@@ -488,6 +490,7 @@ export default function ChatPage() {
           type: msg.type,
           fileUrl: msg.fileUrl,
           createdAt: msg.createdAt,
+          isAI: msg.isAI || false,
           linkPreview: msg.linkPreview,
           replyTo: msg.replyTo ? {
             _id: msg.replyTo.id,
@@ -1344,8 +1347,27 @@ export default function ChatPage() {
                     )}
                   </div>
                 )}
-                <div className="flex flex-col items-start max-w-[70%]">
-                  {/* Show sender name in group chats for messages from others */}
+                
+                {/* Message container with AI logo positioning */}
+                <div className={`flex gap-2 max-w-[70%] ${
+                  message.isAI 
+                    ? (isOwn ? 'flex-row' : 'flex-row-reverse') // AI messages: left for outgoing, right for incoming
+                    : 'flex-row' // Non-AI messages: normal flow
+                }`}>
+                  {/* TarpAI Logo for ALL AI messages */}
+                  {message.isAI && (
+                    <div className="w-6 h-6 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                      <Image
+                        src="/logo.png"
+                        alt="TarpAI"
+                        width={16}
+                        height={16}
+                        className="w-4 h-4 object-contain"
+                      />
+                    </div>
+                  )}
+                  
+                  <div className="flex flex-col items-start">{/* Show sender name in group chats for messages from others */}
                   {isGroupChat && !isOwn && messageSender && (
                     <span className={`text-xs ml-3 mb-1 ${theme === 'light' ? 'text-gray-700' : 'text-gray-400'}`}>
                       {messageSender.displayName || messageSender.name}
@@ -1368,6 +1390,7 @@ export default function ChatPage() {
                           : 'bg-white/10 backdrop-blur-md text-white border border-white/30'
                     } ${isHighlighted ? 'ring-2 ring-blue-500 ring-opacity-50' : ''} ${isSelected ? 'ring-2 ring-blue-600' : ''}`}
                   >
+                  
                   {message.replyTo && (
                     <div 
                       onClick={(e) => {
@@ -1535,6 +1558,7 @@ export default function ChatPage() {
                       </svg>
                     </div>
                   )}
+                </div>
                 </div>
                 </div>
               </div>

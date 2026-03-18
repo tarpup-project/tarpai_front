@@ -26,8 +26,7 @@ export default function TarpAIPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [showCalendarPermissionModal, setShowCalendarPermissionModal] = useState(false);
-  const [showToolsDropdown, setShowToolsDropdown] = useState(false);
+  const [showCustomizeMessage, setShowCustomizeMessage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,34 +43,12 @@ export default function TarpAIPage() {
     }
   }, [router]);
 
-  const handleGrantCalendarPermission = () => {
-    // Build Google OAuth URL for calendar access using separate calendar client
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CALENDAR_CLIENT_ID;
-    const redirectUri = `${window.location.origin}/auth/google/calendar/callback`;
-    const scope = 'https://www.googleapis.com/auth/calendar';
-    
-    // Add state parameter to track the user
-    const state = encodeURIComponent(JSON.stringify({ 
-      userId: (user as any)?._id,
-      returnTo: '/tarpai'
-    }));
-    
-    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-      `client_id=${clientId}` +
-      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-      `&response_type=code` +
-      `&scope=${encodeURIComponent(scope)}` +
-      `&access_type=offline` +
-      `&prompt=consent` +
-      `&state=${state}`;
-    
-    // Redirect to Google OAuth
-    window.location.href = googleAuthUrl;
-  };
-
-  const handleDismissCalendarPermission = () => {
-    setShowCalendarPermissionModal(false);
-    // Don't set permission as granted, so it will show again next time
+  const handleCustomizeClick = () => {
+    setShowCustomizeMessage(true);
+    // Auto-hide the message after 5 seconds
+    setTimeout(() => {
+      setShowCustomizeMessage(false);
+    }, 5000);
   };
 
   useEffect(() => {
@@ -131,11 +108,6 @@ export default function TarpAIPage() {
       };
 
       setMessages((prev) => [...prev, aiMessage]);
-
-      // Check if AI wants to show calendar modal
-      if (response.data.action === 'show_calendar_modal') {
-        setShowCalendarPermissionModal(true);
-      }
     } catch (error: any) {
       console.error('Error sending message:', error);
       toast.error(error.response?.data?.message || 'Failed to send message');
@@ -163,7 +135,7 @@ export default function TarpAIPage() {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
@@ -241,7 +213,7 @@ export default function TarpAIPage() {
               TarpAI Assistant
             </h1>
             <p className={`text-xs ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
-              Your AI-powered helper
+              Your AI-powered Messanger
             </p>
           </div>
           {messages.length > 0 && (
@@ -273,50 +245,24 @@ export default function TarpAIPage() {
                 Welcome to TarpAI!
               </h2>
               <p className={`text-sm mb-6 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
-                I can help you manage appointments, schedule meetings, and answer your questions.
+                Your AI intelligence linking you with people reaching out with important information across all your digital platforms.
               </p>
               
-              {/* Action Buttons */}
-              <div className="flex gap-3 w-full max-w-md">
+              {/* Action Button */}
+              <div className="w-full max-w-md">
                 <button
-                  onClick={() => {
-                    setInputMessage('Create a task schedule for me');
-                    // Optionally auto-send the message
-                    // handleSendMessage();
-                  }}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl font-medium transition ${
+                  onClick={handleCustomizeClick}
+                  className={`w-full flex items-center justify-center gap-2 px-6 py-4 rounded-2xl font-medium transition ${
                     theme === 'light'
                       ? 'bg-white text-gray-600 shadow-md hover:shadow-lg'
                       : 'bg-white/10 backdrop-blur-md text-gray-400 border border-white/20 hover:bg-white/20'
                   }`}
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  <span className="text-sm">Task Schedule</span>
-                </button>
-                
-                <button
-                  onClick={() => {
-                    const hasCalendarPermission = localStorage.getItem('calendarPermissionGranted');
-                    if (hasCalendarPermission) {
-                      setInputMessage('Set an appointment for me');
-                      // Optionally auto-send the message
-                      // handleSendMessage();
-                    } else {
-                      setShowCalendarPermissionModal(true);
-                    }
-                  }}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl font-medium transition ${
-                    theme === 'light'
-                      ? 'bg-white text-gray-600 shadow-md hover:shadow-lg'
-                      : 'bg-white/10 backdrop-blur-md text-gray-400 border border-white/20 hover:bg-white/20'
-                  }`}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <span className="text-sm">{localStorage.getItem('calendarPermissionGranted') ? 'Set Appointment' : 'Add Calendar'}</span>
+                  <span>Customize</span>
                 </button>
               </div>
             </div>
@@ -379,6 +325,48 @@ export default function TarpAIPage() {
             </div>
           )}
 
+          {/* Customize Feature Message */}
+          {showCustomizeMessage && (
+            <div className="flex justify-start">
+              <div
+                className={`max-w-[80%] rounded-2xl px-4 py-3 relative ${
+                  theme === 'light'
+                    ? 'bg-gray-800 text-white'
+                    : theme === 'dark'
+                    ? 'bg-gray-800 text-white'
+                    : 'bg-black/60 backdrop-blur-md text-white'
+                }`}
+              >
+                {/* Upcoming Feature Badge */}
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                    Coming Soon
+                  </span>
+                  <svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                </div>
+                
+                <p className="text-sm">
+                  Tell TarpAI the kind of messages it should consider as important to you
+                </p>
+                
+                <p className="text-xs mt-2 opacity-70">
+                  This feature will allow you to customize TarpAI's urgency detection based on your personal preferences and priorities.
+                </p>
+                
+                <p
+                  className="text-xs mt-1 text-gray-400"
+                >
+                  {new Date().toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div ref={messagesEndRef} />
         </div>
 
@@ -393,84 +381,10 @@ export default function TarpAIPage() {
                 : 'bg-black/60 backdrop-blur-md'
             }`}
           >
-            {/* Tool Icon with Dropdown - Only show when there are messages */}
-            {messages.length > 0 && (
-              <div className="relative flex-shrink-0">
-                <button
-                  onClick={() => setShowToolsDropdown(!showToolsDropdown)}
-                  className={`p-2 rounded-full transition ${
-                    theme === 'light'
-                      ? 'hover:bg-gray-100 text-gray-600'
-                      : 'hover:bg-gray-700 text-gray-400'
-                  }`}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                  </svg>
-                </button>
-
-                {/* Dropdown Menu */}
-                {showToolsDropdown && (
-                  <div
-                    className={`absolute bottom-full left-0 mb-2 w-48 rounded-2xl shadow-lg overflow-hidden ${
-                      theme === 'light' ? 'bg-white' : 'bg-gray-800'
-                    }`}
-                  >
-                    <button
-                      onClick={() => {
-                        const hasCalendarPermission = localStorage.getItem('calendarPermissionGranted');
-                        if (!hasCalendarPermission) {
-                          setShowCalendarPermissionModal(true);
-                        } else {
-                          setInputMessage('Show my calendar events');
-                        }
-                        setShowToolsDropdown(false);
-                      }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 transition ${
-                        theme === 'light'
-                          ? 'hover:bg-gray-100 text-gray-700'
-                          : 'hover:bg-gray-700 text-gray-300'
-                      }`}
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      <span className="text-sm">
-                        {localStorage.getItem('calendarPermissionGranted') ? 'Calendar Events' : 'Add Calendar'}
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        const hasCalendarPermission = localStorage.getItem('calendarPermissionGranted');
-                        if (hasCalendarPermission) {
-                          setInputMessage('Set an appointment for me');
-                        } else {
-                          toast.error('Please connect your calendar first');
-                          setShowCalendarPermissionModal(true);
-                        }
-                        setShowToolsDropdown(false);
-                      }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 transition ${
-                        theme === 'light'
-                          ? 'hover:bg-gray-100 text-gray-700'
-                          : 'hover:bg-gray-700 text-gray-300'
-                      }`}
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span className="text-sm">Set Appointment</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
             <textarea
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyDown}
               placeholder="Ask TarpAI..."
               disabled={isLoading}
               rows={1}
@@ -510,79 +424,6 @@ export default function TarpAIPage() {
 
         <BottomNav />
       </div>
-
-      {/* Google Calendar Permission Modal */}
-      {showCalendarPermissionModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center px-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
-            {/* Calendar Icon */}
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-
-            {/* Title */}
-            <h2 className="text-2xl font-bold text-center text-black mb-3">
-              Connect Your Calendar
-            </h2>
-
-            {/* Description */}
-            <p className="text-gray-600 text-center mb-6">
-              Allow TarpAI to access your Google Calendar to help you schedule tasks, set appointments, and manage your time more effectively.
-            </p>
-
-            {/* Features List */}
-            <div className="space-y-3 mb-6">
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <span className="text-sm text-gray-700">Schedule meetings and appointments</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <span className="text-sm text-gray-700">Set reminders for important tasks</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <span className="text-sm text-gray-700">Get intelligent scheduling suggestions</span>
-              </div>
-            </div>
-
-            {/* Buttons */}
-            <div className="space-y-3">
-              <button
-                onClick={handleGrantCalendarPermission}
-                className="w-full bg-blue-600 text-white py-3 rounded-full font-semibold hover:bg-blue-700 transition flex items-center justify-center gap-2"
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                </svg>
-                Connect with Google
-              </button>
-              <button
-                onClick={handleDismissCalendarPermission}
-                className="w-full bg-gray-100 text-gray-700 py-3 rounded-full font-semibold hover:bg-gray-200 transition"
-              >
-                Maybe Later
-              </button>
-            </div>
-
-            {/* Privacy Note */}
-            <p className="text-xs text-gray-500 text-center mt-4">
-              Your calendar data is secure and will only be used to help you manage your schedule.
-            </p>
-          </div>
-        </div>
-      )}
     </div>
     </div>
     </div>

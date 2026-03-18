@@ -20,39 +20,46 @@ function GoogleCallbackContent() {
         const user = JSON.parse(decodeURIComponent(userStr));
         setAuth(user, token);
         
-        // Check if user needs to complete profile setup (always redirect new Google users to setup-profile)
-        // We'll assume Google users should always go through setup-profile for username customization
-        const isNewGoogleUser = !localStorage.getItem('hasCompletedSetup_' + user.id);
-        
         // Check if there's a stored context from the OAuth flow
         const contextStr = localStorage.getItem('googleOAuthContext');
         if (contextStr) {
           const context = JSON.parse(contextStr);
           localStorage.removeItem('googleOAuthContext'); // Clean up
           
-          // If user is new, redirect to setup-profile first
+          // If this is from a password modal (has a pending action), skip setup-profile
+          // and perform the action directly, even for new users
+          if (context.action && (context.action === 'follow' || context.action === 'chat' || context.action === 'view_status')) {
+            // Perform the pending action directly
+            if (context.action === 'follow' && context.profileUserId) {
+              performFollowAction(context.profileUserId, context.returnUrl);
+            } else if (context.action === 'chat' && context.recipientId && context.messageContent) {
+              performChatAction(context.recipientId, context.messageContent, context.returnUrl);
+            } else if (context.action === 'view_status' && context.statusId) {
+              // For status viewing, just redirect back to the status page
+              toast.success('Successfully signed in with Google!');
+              router.push(context.returnUrl);
+            } else {
+              // Fallback - redirect to return URL or dashboard
+              toast.success('Successfully signed in with Google!');
+              router.push(context.returnUrl || '/dashboard');
+            }
+            return; // Exit early, don't check for setup-profile
+          }
+          
+          // If no specific action but has context, check if user needs setup
+          const isNewGoogleUser = !localStorage.getItem('hasCompletedSetup_' + user.id);
           if (isNewGoogleUser) {
             toast.success('Welcome! Please complete your profile setup.');
             router.push('/setup-profile');
             return;
           }
           
-          // Perform the pending action
-          if (context.action === 'follow' && context.profileUserId) {
-            performFollowAction(context.profileUserId, context.returnUrl);
-          } else if (context.action === 'chat' && context.recipientId && context.messageContent) {
-            performChatAction(context.recipientId, context.messageContent, context.returnUrl);
-          } else if (context.action === 'view_status' && context.statusId) {
-            // For status viewing, just redirect back to the status page
-            toast.success('Successfully signed in with Google!');
-            router.push(context.returnUrl);
-          } else {
-            // No specific action, just redirect to the return URL or dashboard
-            toast.success('Successfully signed in with Google!');
-            router.push(context.returnUrl || '/dashboard');
-          }
+          // Existing user with context but no action - redirect to return URL
+          toast.success('Successfully signed in with Google!');
+          router.push(context.returnUrl || '/dashboard');
         } else {
           // No stored context - check if new user needs profile setup
+          const isNewGoogleUser = !localStorage.getItem('hasCompletedSetup_' + user.id);
           if (isNewGoogleUser) {
             toast.success('Welcome! Please complete your profile setup.');
             router.push('/setup-profile');
