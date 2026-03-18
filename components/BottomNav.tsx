@@ -20,6 +20,31 @@ export default function BottomNav() {
     window.location.href = '/chats';
   };
 
+  // Set correct viewport height for mobile
+  useEffect(() => {
+    const setVH = () => {
+      // Use the smaller of visualViewport.height or window.innerHeight for mobile
+      const vh = window.visualViewport?.height || window.innerHeight;
+      document.documentElement.style.setProperty('--vh', `${vh * 0.01}px`);
+    };
+
+    // Set initial value
+    setVH();
+
+    // Update on resize and viewport changes
+    window.addEventListener('resize', setVH);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', setVH);
+    }
+
+    return () => {
+      window.removeEventListener('resize', setVH);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', setVH);
+      }
+    };
+  }, []);
+
   // Check for urgent messages
   useEffect(() => {
     const checkUrgentMessages = async () => {
@@ -72,7 +97,7 @@ export default function BottomNav() {
     <div 
       className="fixed left-0 right-0 w-full bg-black/60 backdrop-blur-xl border-t border-white/10 z-30 md:left-1/2 md:transform md:-translate-x-1/2 md:max-w-md"
       style={{
-        bottom: '30px'
+        bottom: '0px'
       }}
     >
       <div className="flex justify-around items-center py-4 px-6">

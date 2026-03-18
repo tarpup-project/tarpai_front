@@ -44,6 +44,36 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  /* Prevent mobile pages from being taller than viewport */
+  overflow-x: hidden;
+}
+
+/* Mobile-specific body constraints */
+@media (max-width: 768px) {
+  body {
+    max-height: calc(var(--vh, 1vh) * 100);
+    overflow-y: auto;
+  }
+  
+  /* Ensure main containers don't exceed viewport */
+  body > div,
+  #__next {
+    max-height: calc(var(--vh, 1vh) * 100);
+  }
+}
+
+/* Modern browsers with dvh support */
+@supports (height: 100dvh) {
+  @media (max-width: 768px) {
+    body {
+      max-height: 100dvh;
+    }
+    
+    body > div,
+    #__next {
+      max-height: 100dvh;
+    }
+  }
 }
 
 /* Prevent zoom on input focus on iOS */
@@ -68,6 +98,54 @@ select {
 
 .pr-safe {
   padding-right: env(safe-area-inset-right);
+}
+
+/* Mobile viewport height fix */
+@media (max-width: 768px) {
+  .min-h-screen {
+    min-height: calc(var(--vh, 1vh) * 100);
+    max-height: calc(var(--vh, 1vh) * 100);
+  }
+  
+  /* Also fix any elements using h-screen */
+  .h-screen {
+    height: calc(var(--vh, 1vh) * 100);
+  }
+}
+
+/* Desktop keeps normal behavior */
+@media (min-width: 769px) {
+  .min-h-screen {
+    min-height: 100vh;
+  }
+  
+  .h-screen {
+    height: 100vh;
+  }
+}
+
+/* Fallback for browsers that don't support dvh */
+@supports not (height: 100dvh) {
+  @media (max-width: 768px) {
+    .min-h-screen {
+      min-height: calc(var(--vh, 1vh) * 100);
+      max-height: calc(var(--vh, 1vh) * 100);
+    }
+  }
+}
+
+/* Modern browsers with dvh support */
+@supports (height: 100dvh) {
+  @media (max-width: 768px) {
+    .min-h-screen {
+      min-height: 100dvh;
+      max-height: 100dvh;
+    }
+    
+    .h-screen {
+      height: 100dvh;
+    }
+  }
 }
 
 @keyframes slide-up {
