@@ -43,7 +43,9 @@ export default function SetupProfilePage() {
       });
 
       // Mark that user has completed setup
-      localStorage.setItem('hasCompletedSetup_' + user.id, 'true');
+      if (user?.id) {
+        localStorage.setItem('hasCompletedSetup_' + user.id, 'true');
+      }
 
       toast.success('Profile setup complete!');
       router.push('/dashboard');
