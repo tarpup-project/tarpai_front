@@ -69,7 +69,12 @@ export default function BottomNav() {
   }, []);
 
   return (
-    <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-md bg-black/60 backdrop-blur-xl border-t border-white/10 z-30">
+    <div 
+      className="fixed left-0 right-0 w-full bg-black/60 backdrop-blur-xl border-t border-white/10 z-30 md:left-1/2 md:transform md:-translate-x-1/2 md:max-w-md"
+      style={{
+        bottom: '30px'
+      }}
+    >
       <div className="flex justify-around items-center py-4 px-6">
         <button 
           onClick={() => router.push('/dashboard')}
