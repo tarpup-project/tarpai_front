@@ -1421,7 +1421,7 @@ export default function ChatPage() {
                               'Unknown'
                             : chatUser?.displayName || chatUser?.name}
                       </p>
-                      <p className={`text-xs ${isOwn ? 'opacity-60' : 'opacity-70'} truncate`}>
+                      <p className={`text-xs ${isOwn ? 'opacity-60' : 'opacity-70'} truncate max-w-[200px] overflow-hidden whitespace-nowrap`}>
                         {message.replyTo.content}
                       </p>
                     </div>
@@ -1593,7 +1593,7 @@ export default function ChatPage() {
                   Replying to {replyingTo.sender === currentUser?.id ? 'yourself' : chatUser?.displayName || chatUser?.name}
                 </span>
               </div>
-              <p className="text-sm text-white truncate">{replyingTo.content}</p>
+              <p className="text-sm text-white truncate max-w-[250px] overflow-hidden whitespace-nowrap">{replyingTo.content}</p>
             </div>
             <button
               onClick={() => setReplyingTo(null)}
