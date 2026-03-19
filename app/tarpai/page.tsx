@@ -136,10 +136,11 @@ export default function TarpAIPage() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
+    // Allow Enter for new lines when Shift is not pressed
   };
 
   // Show loading spinner while checking authentication
@@ -213,7 +214,7 @@ export default function TarpAIPage() {
               TarpAI Assistant
             </h1>
             <p className={`text-xs ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
-              Your AI-powered Messanger
+              Your AI-powered Messenger
             </p>
           </div>
           {messages.length > 0 && (
@@ -388,12 +389,15 @@ export default function TarpAIPage() {
               placeholder="Ask TarpAI..."
               disabled={isLoading}
               rows={1}
-              className={`flex-1 bg-transparent outline-none text-sm resize-none max-h-32 overflow-y-auto ${
+              className={`flex-1 bg-transparent outline-none focus:outline-none text-sm resize-none max-h-32 overflow-y-auto ${
                 theme === 'light' ? 'text-black placeholder-gray-400' : 'text-white placeholder-gray-400'
               }`}
               style={{
                 minHeight: '24px',
                 height: 'auto',
+                outline: 'none',
+                border: 'none',
+                boxShadow: 'none',
               }}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;

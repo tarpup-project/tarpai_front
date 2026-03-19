@@ -1009,9 +1009,14 @@ export default function ChatPage() {
                         value={publicUserName}
                         onChange={(e) => setPublicUserName(e.target.value)}
                         placeholder="Enter your first name:"
-                        className={`flex-1 bg-transparent border-none outline-none text-base ${
+                        className={`flex-1 bg-transparent border-none outline-none focus:outline-none text-base ${
                           theme === 'light' ? 'text-gray-900 placeholder-gray-500' : 'text-white placeholder-gray-400'
                         }`}
+                        style={{
+                          outline: 'none',
+                          border: 'none',
+                          boxShadow: 'none',
+                        }}
                       />
                     </div>
 
@@ -1024,9 +1029,14 @@ export default function ChatPage() {
                         value={publicUserEmail}
                         onChange={(e) => setPublicUserEmail(e.target.value)}
                         placeholder="Enter your email"
-                        className={`flex-1 bg-transparent border-none outline-none text-base ${
+                        className={`flex-1 bg-transparent border-none outline-none focus:outline-none text-base ${
                           theme === 'light' ? 'text-gray-900 placeholder-gray-500' : 'text-white placeholder-gray-400'
                         }`}
+                        style={{
+                          outline: 'none',
+                          border: 'none',
+                          boxShadow: 'none',
+                        }}
                       />
                     </div>
 
@@ -1036,12 +1046,15 @@ export default function ChatPage() {
                       onChange={(e) => setPublicUserMessage(e.target.value)}
                       placeholder="What's on your mind?"
                       rows={1}
-                      className={`flex-1 bg-transparent border-none outline-none text-base resize-none overflow-hidden ${
+                      className={`flex-1 bg-transparent border-none outline-none focus:outline-none text-base resize-none overflow-hidden ${
                         theme === 'light' ? 'text-gray-900 placeholder-gray-500' : 'text-white placeholder-gray-400'
                       }`}
                       style={{
                         minHeight: '24px',
                         maxHeight: '120px',
+                        outline: 'none',
+                        border: 'none',
+                        boxShadow: 'none',
                       }}
                       onInput={(e) => {
                         const target = e.target as HTMLTextAreaElement;
