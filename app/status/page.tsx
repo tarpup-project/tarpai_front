@@ -445,9 +445,38 @@ export default function StatusPage() {
       setSelectedImages([]);
       setImagePreviewUrls([]);
       fetchStatuses();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create status:', error);
-      toast.error('Failed to post status');
+      
+      // Handle specific error cases
+      if (error.response?.status === 413 || error.message?.includes('File too large') || error.message?.includes('413')) {
+        toast.error('Image file is too large. Please reduce the image size and try again.');
+      } else if (error.response?.status === 400) {
+        const errorMessage = error.response?.data?.message;
+        if (errorMessage?.includes('image') || errorMessage?.includes('file')) {
+          toast.error('Invalid image format. Please use JPG, PNG, or GIF files.');
+        } else if (errorMessage?.includes('content')) {
+          toast.error('Status content is invalid. Please check your text and try again.');
+        } else {
+          toast.error(errorMessage || 'Invalid request. Please check your input and try again.');
+        }
+      } else if (error.response?.status === 401) {
+        toast.error('You need to log in to post a status.');
+      } else if (error.response?.status === 403) {
+        toast.error('You do not have permission to post this status.');
+      } else if (error.response?.status === 500) {
+        toast.error('Server error occurred. Please try again later.');
+      } else if (error.code === 'NETWORK_ERROR' || !navigator.onLine) {
+        toast.error('Network error. Please check your internet connection and try again.');
+      } else {
+        // Generic fallback
+        const errorMessage = error.response?.data?.message || error.message;
+        if (errorMessage?.toLowerCase().includes('size') || errorMessage?.toLowerCase().includes('large')) {
+          toast.error('Image file is too large. Please reduce the image size and try again.');
+        } else {
+          toast.error(errorMessage || 'Failed to post status. Please try again.');
+        }
+      }
     } finally {
       setIsPosting(false);
     }

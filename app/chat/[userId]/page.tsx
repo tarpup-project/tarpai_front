@@ -1661,7 +1661,7 @@ export default function ChatPage() {
               placeholder="Type a message..."
               disabled={uploadingImage}
               rows={1}
-              className="flex-1 min-w-0 bg-black/50 backdrop-blur-md text-white rounded-full px-5 py-2.5 focus:outline-none focus:ring-2 focus:ring-gray-600 border border-white/10 placeholder-gray-400 disabled:opacity-50 resize-none overflow-hidden"
+              className="flex-1 min-w-0 bg-black/50 backdrop-blur-md text-white rounded-xl px-5 py-2.5 focus:outline-none focus:ring-2 focus:ring-gray-600 border border-white/10 placeholder-gray-400 disabled:opacity-50 resize-none overflow-hidden"
               style={{
                 minHeight: '42px',
                 maxHeight: '120px',
