@@ -84,6 +84,7 @@ export default function StatusPage() {
   const [showLikesModal, setShowLikesModal] = useState(false);
   const [selectedStatusForLikes, setSelectedStatusForLikes] = useState<string | null>(null);
   const [selectedStatusLikesCount, setSelectedStatusLikesCount] = useState(0);
+  const [viewedStatuses, setViewedStatuses] = useState<Set<string>>(new Set());
 
   // Check authentication immediately using localStorage
   useEffect(() => {
@@ -94,6 +95,17 @@ export default function StatusPage() {
     } else {
       setIsCheckingAuth(false);
     }
+
+    // Load viewed statuses from localStorage
+    const viewedStatusIds = localStorage.getItem('viewedStatuses');
+    if (viewedStatusIds) {
+      try {
+        const parsed = JSON.parse(viewedStatusIds);
+        setViewedStatuses(new Set(parsed));
+      } catch (error) {
+        console.error('Failed to parse viewed statuses:', error);
+      }
+    }
   }, [router]);
 
   useEffect(() => {
@@ -103,6 +115,49 @@ export default function StatusPage() {
       fetchStatuses();
     }
   }, [user, isCheckingAuth]);
+
+  // Mark current status as viewed when modal is open and status changes
+  useEffect(() => {
+    if (showStatusModal && selectedStatusGroup && getCurrentStatus()) {
+      const currentStatus = getCurrentStatus();
+      if (currentStatus && currentStatus.author._id !== user?.id) {
+        markStatusAsViewed(currentStatus.id);
+      }
+    }
+  }, [showStatusModal, selectedStatusGroup, currentStatusIndex, user?.id]);
+
+  // Helper functions for managing viewed statuses
+  const markStatusAsViewed = (statusId: string) => {
+    const newViewedStatuses = new Set(viewedStatuses);
+    newViewedStatuses.add(statusId);
+    setViewedStatuses(newViewedStatuses);
+    
+    // Save to localStorage
+    localStorage.setItem('viewedStatuses', JSON.stringify(Array.from(newViewedStatuses)));
+  };
+
+  const isStatusGroupNew = (group: GroupedStatus) => {
+    // Don't show "NEW" for own statuses
+    if (group.author._id === user?.id) return false;
+    
+    // Check if any status in this group has not been viewed
+    return group.statuses.some(status => !viewedStatuses.has(status.id));
+  };
+
+  // Clean up old viewed statuses (keep only those that are still in current feed)
+  const cleanupViewedStatuses = (currentStatuses: GroupedStatus[]) => {
+    const currentStatusIds = new Set(
+      currentStatuses.flatMap(group => group.statuses.map(status => status.id))
+    );
+    const cleanedViewedStatuses = new Set(
+      Array.from(viewedStatuses).filter(statusId => currentStatusIds.has(statusId))
+    );
+    
+    if (cleanedViewedStatuses.size !== viewedStatuses.size) {
+      setViewedStatuses(cleanedViewedStatuses);
+      localStorage.setItem('viewedStatuses', JSON.stringify(Array.from(cleanedViewedStatuses)));
+    }
+  };
 
   // Helper function to render text with clickable links
   const renderTextWithLinks = (text: string) => {
@@ -164,6 +219,9 @@ export default function StatusPage() {
       
       console.log('Grouped statuses:', groupedArray);
       setStatuses(groupedArray);
+      
+      // Clean up old viewed statuses
+      cleanupViewedStatuses(groupedArray);
     } catch (error) {
       console.error('Failed to fetch statuses:', error);
       toast.error('Failed to load statuses');
@@ -249,7 +307,21 @@ export default function StatusPage() {
 
   const handleStatusGroupClick = (group: GroupedStatus) => {
     setSelectedStatusGroup(group);
-    setCurrentStatusIndex(0);
+    
+    // Find the first unviewed status in the group
+    let startIndex = 0;
+    if (group.author._id !== user?.id) {
+      // For other users' statuses, find the first unviewed one
+      const firstUnviewedIndex = group.statuses.findIndex(status => !viewedStatuses.has(status.id));
+      if (firstUnviewedIndex !== -1) {
+        startIndex = firstUnviewedIndex;
+      } else {
+        // If all are viewed, start from the last one
+        startIndex = group.statuses.length - 1;
+      }
+    }
+    
+    setCurrentStatusIndex(startIndex);
     setShowStatusModal(true);
     setShowControls(true); // Reset controls visibility when opening modal
   };
@@ -690,9 +762,9 @@ export default function StatusPage() {
         <div className="flex-1 px-2 pb-32 overflow-y-auto">
           <div className="grid grid-cols-2 gap-3">
             {statuses.map((group) => {
-              const firstStatus = group.statuses[0];
+              const lastStatus = group.statuses[group.statuses.length - 1]; // Show the latest status in thumbnail
               const statusCount = group.statuses.length;
-              const hasImage = firstStatus.images && firstStatus.images.length > 0;
+              const hasImage = lastStatus.images && lastStatus.images.length > 0;
               
               return (
                 <div
@@ -704,12 +776,19 @@ export default function StatusPage() {
                   {hasImage && (
                     <div className="relative">
                       <Image
-                        src={firstStatus.images[0]}
+                        src={lastStatus.images[0]}
                         alt="Status"
                         width={400}
                         height={400}
                         className="w-full h-64 object-cover"
                       />
+                      
+                      {/* NEW indicator - top left */}
+                      {isStatusGroupNew(group) && (
+                        <div className="absolute top-2 left-2 bg-red-500 text-white rounded-lg px-2 py-1 text-xs font-bold shadow-lg z-10">
+                          NEW
+                        </div>
+                      )}
                       
                       {/* Status count indicator */}
                       {statusCount > 1 && (
@@ -725,21 +804,31 @@ export default function StatusPage() {
 
                   {/* Content and Author Info - Flex grow to push author to bottom */}
                   <div className="flex flex-col flex-1 p-3">
-                    {/* Show count badge for text-only statuses */}
-                    {!hasImage && statusCount > 1 && (
-                      <div className="flex justify-end mb-2">
-                        <div className="bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1">
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                          </svg>
-                          <span className="text-xs font-medium">{statusCount}</span>
-                        </div>
+                    {/* NEW indicator and count badge for text-only statuses */}
+                    {!hasImage && (
+                      <div className="flex justify-between items-start mb-2">
+                        {/* NEW indicator - top left for text-only */}
+                        {isStatusGroupNew(group) && (
+                          <div className="bg-red-500 text-white rounded-lg px-2 py-1 text-xs font-bold shadow-lg">
+                            NEW
+                          </div>
+                        )}
+                        
+                        {/* Count badge - top right for text-only */}
+                        {statusCount > 1 && (
+                          <div className="bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                            </svg>
+                            <span className="text-xs font-medium">{statusCount}</span>
+                          </div>
+                        )}
                       </div>
                     )}
                     
                     {/* Content - grows to fill space */}
-                    {firstStatus.content && (
-                      <p className="text-sm mb-2 line-clamp-2 whitespace-pre-wrap flex-1">{firstStatus.content}</p>
+                    {lastStatus.content && (
+                      <p className="text-sm mb-2 line-clamp-2 whitespace-pre-wrap flex-1">{lastStatus.content}</p>
                     )}
                     
                     {/* Author Info - stays at bottom */}
