@@ -79,6 +79,25 @@ export default function UsernamePage() {
     fetchProfile();
   }, [username]);
 
+  // Track profile visit
+  useEffect(() => {
+    if (username && username !== 'undefined') {
+      trackProfileVisit();
+    }
+  }, [username]); // Only track when username changes, not when currentUser changes
+
+  const trackProfileVisit = async () => {
+    try {
+      await publicApi.post('/analytics/track-profile-visit', {
+        username,
+        visitorId: currentUser?.id // This will be undefined for anonymous users, which is fine
+      });
+    } catch (error) {
+      // Silently fail - analytics shouldn't break the user experience
+      console.log('Failed to track profile visit:', error);
+    }
+  };
+
   // Redirect to dashboard if user is viewing their own profile
   useEffect(() => {
     if (currentUser && currentUser.username === username) {

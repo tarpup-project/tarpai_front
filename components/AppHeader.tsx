@@ -17,6 +17,9 @@ interface Notification {
   type: string;
   isRead: boolean;
   createdAt: string;
+  // Rich message fields for admin broadcasts
+  actionUrl?: string;
+  actionLabel?: string;
   sender?: {
     _id: string;
     name: string;
@@ -122,8 +125,11 @@ export default function AppHeader() {
       // Close the modal
       setShowNotificationsModal(false);
 
-      // Navigate based on notification type
-      if (notification.type === 'broadcast') {
+      // Navigate based on notification type or actionUrl
+      if (notification.actionUrl) {
+        // Rich message with action URL
+        router.push(notification.actionUrl);
+      } else if (notification.type === 'broadcast') {
         router.push('/chats?tab=broadcasts');
       } else if (notification.type === 'chat_message' && notification.sender?._id) {
         window.location.href = `/chat/${notification.sender._id}`;
@@ -133,6 +139,31 @@ export default function AppHeader() {
       }
     } catch (error) {
       console.error('Failed to handle notification:', error);
+    }
+  };
+
+  const handleActionButtonClick = async (notification: Notification, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent the notification click handler from firing
+    
+    if (notification.actionUrl) {
+      try {
+        // Mark as read
+        await api.patch(`/notifications/${notification._id}/read`);
+        
+        // Update local state
+        setNotifications(prev =>
+          prev.map(n => n._id === notification._id ? { ...n, isRead: true } : n)
+        );
+        setUnreadCount(prev => Math.max(0, prev - 1));
+
+        // Close the modal
+        setShowNotificationsModal(false);
+
+        // Navigate to action URL
+        router.push(notification.actionUrl);
+      } catch (error) {
+        console.error('Failed to handle action button click:', error);
+      }
     }
   };
 
@@ -374,13 +405,22 @@ export default function AppHeader() {
                               {notification.message}
                             </p>
                             
-                            {/* Action buttons for certain notification types */}
-                            {notification.type === 'suggestion' && (
+                            {/* Action buttons for rich broadcast messages only */}
+                            {notification.type === 'broadcast' && notification.actionUrl && notification.actionLabel && (
+                              <button 
+                                onClick={(e) => handleActionButtonClick(notification, e)}
+                                className="mt-3 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition"
+                              >
+                                {notification.actionLabel}
+                              </button>
+                            )}
+                            {/* Legacy action buttons for other notification types (only if no rich message fields) */}
+                            {notification.type === 'suggestion' && !notification.actionUrl && (
                               <button className="mt-3 px-4 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50 transition">
                                 Review
                               </button>
                             )}
-                            {notification.type === 'feature' && (
+                            {notification.type === 'feature' && !notification.actionUrl && (
                               <button className="mt-3 px-4 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50 transition">
                                 Try Now
                               </button>
