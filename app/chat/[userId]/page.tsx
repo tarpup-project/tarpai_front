@@ -90,6 +90,8 @@ export default function ChatPage() {
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [canSendMessage, setCanSendMessage] = useState(true);
+  const [waitingForReply, setWaitingForReply] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -436,7 +438,7 @@ export default function ChatPage() {
             !(m._id.startsWith('temp-') && m.content === message.content && m.sender === (message.sender._id || message.sender))
           );
           
-          return [...filteredMessages, {
+          const newMessages = [...filteredMessages, {
             _id: message.id,
             sender: message.sender._id || message.sender,
             content: message.content,
@@ -451,6 +453,11 @@ export default function ChatPage() {
               content: message.replyTo.content,
             } : undefined,
           }];
+          
+          // Check if user can send messages after receiving new message
+          setTimeout(() => checkCanSendMessage(newMessages), 100);
+          
+          return newMessages;
         });
         
         // Automatically mark as read if we're viewing this conversation
@@ -498,6 +505,10 @@ export default function ChatPage() {
             content: msg.replyTo.content,
           } : undefined,
         })));
+        
+        // Check if user can send messages based on conversation state
+        checkCanSendMessage(messagesResponse.data.messages);
+        
         scrollToBottom();
       } catch (error) {
         console.log('No previous messages');
@@ -515,6 +526,43 @@ export default function ChatPage() {
       router.push('/dashboard');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkCanSendMessage = (messages: any[]) => {
+    if (!currentUser || messages.length === 0) {
+      setCanSendMessage(true);
+      setWaitingForReply(false);
+      return;
+    }
+
+    // Sort messages by creation date to get chronological order
+    const sortedMessages = messages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    
+    // Check if current user sent the first message
+    const firstMessage = sortedMessages[0];
+    const currentUserSentFirst = firstMessage.sender._id === currentUser.id || firstMessage.sender === currentUser.id;
+    
+    if (!currentUserSentFirst) {
+      // Current user didn't send first message, they can always send
+      setCanSendMessage(true);
+      setWaitingForReply(false);
+      return;
+    }
+
+    // Current user sent the first message, check if recipient has replied
+    const recipientHasReplied = sortedMessages.some(msg => 
+      (msg.sender._id !== currentUser.id && msg.sender !== currentUser.id) && !msg.isAI
+    );
+
+    if (recipientHasReplied) {
+      // Recipient has replied, user can send messages
+      setCanSendMessage(true);
+      setWaitingForReply(false);
+    } else {
+      // Recipient hasn't replied yet, user must wait
+      setCanSendMessage(false);
+      setWaitingForReply(true);
     }
   };
 
@@ -1633,60 +1681,84 @@ export default function ChatPage() {
           </div>
         )}
 
-        {/* Input */}
-        <div className={`backdrop-blur-md border-t p-4 ${
-          theme === 'light' 
-            ? 'bg-white/10 border-gray-100' 
-            : 'bg-black/40 border-white/10'
-        }`}>
-          <div className="flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleImageSelect}
-              className="hidden"
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-10 h-10 shrink-0 bg-black/50 rounded-full flex items-center justify-center hover:bg-white/20 transition"
-            >
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </button>
-            <textarea
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type a message..."
-              disabled={uploadingImage}
-              rows={1}
-              className="flex-1 min-w-0 bg-black/50 backdrop-blur-md text-white rounded-xl px-5 py-2.5 focus:outline-none focus:ring-2 focus:ring-gray-600 border border-white/10 placeholder-gray-400 disabled:opacity-50 resize-none overflow-hidden"
-              style={{
-                minHeight: '42px',
-                maxHeight: '120px',
-              }}
-              onInput={(e) => {
-                const target = e.target as HTMLTextAreaElement;
-                target.style.height = 'auto';
-                target.style.height = Math.min(target.scrollHeight, 120) + 'px';
-              }}
-            />
-            <button
-              onClick={handleSendMessage}
-              disabled={sending || uploadingImage || (!newMessage.trim() && !selectedImage)}
-              className="w-10 h-10 shrink-0 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed transform rotate-325"
-            >
-              {uploadingImage ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              ) : (
-                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+        {/* Input or Waiting Message */}
+        {canSendMessage ? (
+          <div className={`backdrop-blur-md border-t p-4 ${
+            theme === 'light' 
+              ? 'bg-white/10 border-gray-100' 
+              : 'bg-black/40 border-white/10'
+          }`}>
+            <div className="flex items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-10 h-10 shrink-0 bg-black/50 rounded-full flex items-center justify-center hover:bg-white/20 transition"
+              >
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-              )}
-            </button>
+              </button>
+              <textarea
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type a message..."
+                disabled={uploadingImage}
+                rows={1}
+                className="flex-1 min-w-0 bg-black/50 backdrop-blur-md text-white rounded-xl px-5 py-2.5 focus:outline-none focus:ring-2 focus:ring-gray-600 border border-white/10 placeholder-gray-400 disabled:opacity-50 resize-none overflow-hidden"
+                style={{
+                  minHeight: '42px',
+                  maxHeight: '120px',
+                }}
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement;
+                  target.style.height = 'auto';
+                  target.style.height = Math.min(target.scrollHeight, 120) + 'px';
+                }}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={sending || uploadingImage || (!newMessage.trim() && !selectedImage)}
+                className="w-10 h-10 shrink-0 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed transform rotate-325"
+              >
+                {uploadingImage ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                ) : (
+                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className={`backdrop-blur-md border-t p-4 ${
+            theme === 'light' 
+              ? 'bg-white/10 border-gray-100' 
+              : 'bg-black/40 border-white/10'
+          }`}>
+            <div className="flex items-center justify-center py-4">
+              <div className="text-center">
+                <div className="mb-2">
+                  <svg className="w-8 h-8 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                </div>
+                <p className={`text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-gray-300'}`}>
+                  Continue chatting, once recipient replies
+                </p>
+                <p className={`text-xs mt-1 ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
+                  You sent the first message. Wait for {chatUser?.displayName || chatUser?.name || 'them'} to respond.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Image Cropper */}

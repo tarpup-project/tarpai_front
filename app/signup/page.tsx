@@ -105,12 +105,18 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="lg:grid lg:grid-cols-2 min-h-screen">
+    <div 
+      className="min-h-screen bg-black text-white" 
+      style={{ 
+        minHeight: '100vh', 
+        backgroundColor: '#000000'
+      }}
+    >
+      <div className="lg:grid lg:grid-cols-2 min-h-screen bg-black" style={{ backgroundColor: '#000000' }}>
         {/* Left Column - Form */}
-        <div className="flex flex-col">
+        <div className="flex flex-col min-h-screen bg-black" style={{ backgroundColor: '#000000' }}>
           {/* Header */}
-          <header className="p-6">
+          <header className="p-6 flex-shrink-0 bg-black" style={{ backgroundColor: '#000000' }}>
             <Link href="/" className="flex items-center gap-2">
               <span className="text-xl">←</span>
               <span className="text-gray-400">Back</span>
@@ -118,8 +124,8 @@ export default function SignupPage() {
           </header>
 
           {/* Main Content */}
-          <main className="flex-1 flex items-center justify-center px-6">
-            <div className="w-full max-w-md">
+          <main className="flex-1 flex items-center justify-center px-6 py-8 bg-black" style={{ backgroundColor: '#000000' }}>
+            <div className="w-full max-w-md bg-black" style={{ backgroundColor: '#000000' }}>
               <div className="mb-8">
                 <Image src="/logo.png" alt="TarpAI" width={48} height={48} className="w-12 h-12 mb-6" />
                 <h1 className="text-4xl font-bold mb-2">Create account</h1>

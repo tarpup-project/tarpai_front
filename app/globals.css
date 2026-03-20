@@ -48,6 +48,32 @@ body {
   overflow-x: hidden;
 }
 
+/* Mobile viewport height fixes */
+html, body {
+  height: 100%;
+  min-height: 100%;
+}
+
+/* Fix for mobile browsers with dynamic viewport */
+@supports (height: 100dvh) {
+  html, body {
+    height: 100dvh;
+    min-height: 100dvh;
+  }
+}
+
+/* Ensure full height on mobile */
+#__next {
+  height: 100%;
+  min-height: 100vh;
+}
+
+@supports (min-height: 100dvh) {
+  #__next {
+    min-height: 100dvh;
+  }
+}
+
 /* Mobile-specific body constraints */
 @media (max-width: 768px) {
   body {
