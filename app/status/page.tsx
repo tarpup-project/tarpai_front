@@ -122,6 +122,9 @@ export default function StatusPage() {
       const currentStatus = getCurrentStatus();
       if (currentStatus && currentStatus.author._id !== user?.id) {
         markStatusAsViewed(currentStatus.id);
+        
+        // Notify BottomNav about status updates
+        window.dispatchEvent(new CustomEvent('statusUpdate'));
       }
     }
   }, [showStatusModal, selectedStatusGroup, currentStatusIndex, user?.id]);
@@ -222,6 +225,9 @@ export default function StatusPage() {
       
       // Clean up old viewed statuses
       cleanupViewedStatuses(groupedArray);
+      
+      // Notify BottomNav about status updates
+      window.dispatchEvent(new CustomEvent('statusUpdate'));
     } catch (error) {
       console.error('Failed to fetch statuses:', error);
       toast.error('Failed to load statuses');
