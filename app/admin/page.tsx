@@ -692,6 +692,8 @@ export default function AdminDashboard() {
   };
 
   const handleSendBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault(); // Prevent form submission and page reload
+    
     if (!broadcastForm.message.trim()) {
       toast.error('Please enter a message');
       return;
@@ -2055,13 +2057,39 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="bg-gray-900 rounded-lg p-6">
-                    <h4 className="text-lg font-semibold mb-4">Daily Profile Visits (Last 7 Days)</h4>
-                    <div className="space-y-2">
+                  <div className="bg-gray-900 rounded-lg p-4 sm:p-6">
+                    <h4 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Daily Profile Visits (Last 7 Days)</h4>
+                    <div className="space-y-3 sm:space-y-2">
                       {profileVisits.dailyVisits.map((day) => (
-                        <div key={day.date} className="flex items-center justify-between">
-                          <span className="text-gray-400">{new Date(day.date).toLocaleDateString()}</span>
-                          <div className="flex items-center gap-4">
+                        <div key={day.date} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0">
+                          <span className="text-gray-400 text-sm sm:text-base">{new Date(day.date).toLocaleDateString()}</span>
+                          
+                          {/* Mobile Layout - Stacked */}
+                          <div className="flex flex-col gap-2 sm:hidden">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-500">Total:</span>
+                                <div 
+                                  className="bg-green-600 h-2 rounded"
+                                  style={{ width: `${Math.max(Math.floor(day.total / 2) * 5, 4)}px` }}
+                                />
+                              </div>
+                              <span className="font-bold text-sm">{Math.floor(day.total / 2)}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-500">Unique:</span>
+                                <div 
+                                  className="bg-blue-600 h-2 rounded"
+                                  style={{ width: `${Math.max(Math.floor(day.unique / 2) * 5, 4)}px` }}
+                                />
+                              </div>
+                              <span className="font-bold text-sm">{Math.floor(day.unique / 2)}</span>
+                            </div>
+                          </div>
+
+                          {/* Desktop Layout - Horizontal */}
+                          <div className="hidden sm:flex items-center gap-4">
                             <div className="flex items-center gap-2">
                               <span className="text-xs text-gray-500">Total:</span>
                               <div 

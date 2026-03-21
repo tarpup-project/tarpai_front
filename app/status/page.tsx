@@ -320,10 +320,11 @@ export default function StatusPage() {
       // For other users' statuses, find the first unviewed one
       const firstUnviewedIndex = group.statuses.findIndex(status => !viewedStatuses.has(status.id));
       if (firstUnviewedIndex !== -1) {
+        // Has unviewed statuses - start from first unviewed
         startIndex = firstUnviewedIndex;
       } else {
-        // If all are viewed, start from the last one
-        startIndex = group.statuses.length - 1;
+        // All statuses viewed - start from the beginning for re-viewing
+        startIndex = 0;
       }
     }
     
