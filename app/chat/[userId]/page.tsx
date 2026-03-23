@@ -92,10 +92,31 @@ export default function ChatPage() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [canSendMessage, setCanSendMessage] = useState(true);
   const [waitingForReply, setWaitingForReply] = useState(false);
+  const [lastMessageSentTime, setLastMessageSentTime] = useState<Date | null>(null);
+  const [messageTimeoutId, setMessageTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Function to handle when user sends a message
+  const handleMessageSent = () => {
+    const now = new Date();
+    setLastMessageSentTime(now);
+    
+    // Keep input available for 3 minutes, then lock it if no reply
+    // The checkCanSendMessage function will handle the actual locking logic
+    // when it's called periodically or when new messages arrive
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (messageTimeoutId) {
+        clearTimeout(messageTimeoutId);
+      }
+    };
+  }, [messageTimeoutId]);
 
   // Track user activity
   useEffect(() => {
@@ -489,7 +510,14 @@ export default function ChatPage() {
 
       // Fetch conversation history
       try {
+        console.log('=== FETCHING MESSAGES ===');
+        console.log('Conversation ID:', conversationId);
+        console.log('Current User ID:', currentUser?.id);
+        
         const messagesResponse = await publicApi.get(`/chat/conversations/${conversationId}/messages`);
+        console.log('Messages response:', messagesResponse.data);
+        console.log('Number of messages:', messagesResponse.data.messages?.length || 0);
+        
         setMessages(messagesResponse.data.messages.map((msg: any) => ({
           _id: msg.id,
           sender: msg.sender._id || msg.sender,
@@ -511,7 +539,9 @@ export default function ChatPage() {
         
         scrollToBottom();
       } catch (error) {
-        console.log('No previous messages');
+        console.log('=== FAILED TO FETCH MESSAGES ===');
+        console.error('Error details:', error);
+        console.log('No previous messages or fetch failed');
       }
 
       // Store conversationId for sending messages
@@ -560,9 +590,44 @@ export default function ChatPage() {
       setCanSendMessage(true);
       setWaitingForReply(false);
     } else {
-      // Recipient hasn't replied yet, user must wait
-      setCanSendMessage(false);
-      setWaitingForReply(true);
+      // Recipient hasn't replied yet, check 3-minute rule
+      const lastUserMessage = sortedMessages
+        .filter(msg => (msg.sender._id === currentUser.id || msg.sender === currentUser.id) && !msg.isAI)
+        .pop(); // Get the last message from current user
+
+      if (lastUserMessage) {
+        const lastMessageTime = new Date(lastUserMessage.createdAt);
+        const now = new Date();
+        const timeDiff = now.getTime() - lastMessageTime.getTime();
+        const threeMinutes = 3 * 60 * 1000; // 3 minutes in milliseconds
+
+        if (timeDiff < threeMinutes) {
+          // Less than 3 minutes have passed, user can still send messages
+          setCanSendMessage(true);
+          setWaitingForReply(false);
+          
+          // Set a timeout to lock the input after the remaining time
+          const remainingTime = threeMinutes - timeDiff;
+          if (messageTimeoutId) {
+            clearTimeout(messageTimeoutId);
+          }
+          
+          const timeoutId = setTimeout(() => {
+            setCanSendMessage(false);
+            setWaitingForReply(true);
+          }, remainingTime);
+          
+          setMessageTimeoutId(timeoutId);
+        } else {
+          // More than 3 minutes have passed, lock the input
+          setCanSendMessage(false);
+          setWaitingForReply(true);
+        }
+      } else {
+        // No previous messages from user, they can send
+        setCanSendMessage(true);
+        setWaitingForReply(false);
+      }
     }
   };
 
@@ -647,6 +712,9 @@ export default function ChatPage() {
           setImagePreview(null);
           setReplyingTo(null);
           toast.success('Image sent');
+          
+          // Track that user sent a message for 3-minute rule
+          handleMessageSent();
         } catch (error) {
           console.error('Failed to send image:', error);
           toast.error('Failed to send image');
@@ -684,6 +752,9 @@ export default function ChatPage() {
         
         socketRef.current.emit('send_message', messageData);
         setReplyingTo(null); // Clear reply state
+        
+        // Track that user sent a message for 3-minute rule
+        handleMessageSent();
       }
       
       scrollToBottom();

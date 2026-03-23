@@ -214,7 +214,7 @@ export default function TarpAIPage() {
               TarpAI Assistant
             </h1>
             <p className={`text-xs ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
-              Your AI-powered Messenger
+              Your Messaging Assistant
             </p>
           </div>
           {messages.length > 0 && (
@@ -246,7 +246,7 @@ export default function TarpAIPage() {
                 Welcome to TarpAI!
               </h2>
               <p className={`text-sm mb-6 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`}>
-                Your AI intelligence linking you with people reaching out with important information across all your digital platforms.
+                Your messaging assistant that helps you communicate with people across platforms.
               </p>
               
               {/* Action Button */}
@@ -349,11 +349,11 @@ export default function TarpAIPage() {
                 </div>
                 
                 <p className="text-sm">
-                  Tell TarpAI the kind of messages it should consider as important to you
+                  Tell TarpAI how you'd like help with messaging and connecting with others
                 </p>
                 
                 <p className="text-xs mt-2 opacity-70">
-                  This feature will allow you to customize TarpAI's urgency detection based on your personal preferences and priorities.
+                  This feature will allow you to customize TarpAI's messaging assistance based on your communication preferences and needs.
                 </p>
                 
                 <p

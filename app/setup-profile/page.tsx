@@ -64,14 +64,6 @@ export default function SetupProfilePage() {
     <div className="min-h-screen bg-black text-white flex items-center justify-center px-6">
       <div className="w-full max-w-md">
         <div className="bg-gray-900 rounded-2xl p-8 relative">
-          {/* Close Button */}
-          <button
-            onClick={handleSkip}
-            className="absolute top-6 right-6 text-gray-400 hover:text-white"
-          >
-            ✕
-          </button>
-
           <h2 className="text-2xl font-bold mb-2">Choose your username</h2>
           <p className="text-gray-400 mb-6">Try something similar to your social handles for easy recognition.</p>
 
