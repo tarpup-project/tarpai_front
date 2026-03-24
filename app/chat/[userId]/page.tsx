@@ -13,6 +13,7 @@ import { io, Socket } from 'socket.io-client';
 import toast from 'react-hot-toast';
 import ImageCropper from '@/components/ImageCropper';
 import PasswordModal from '@/components/PasswordModal';
+import { compressImageToTarget, formatFileSize } from '@/utils/imageCompression';
 
 interface Message {
   _id: string;
@@ -766,75 +767,112 @@ export default function ChatPage() {
     }
   };
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        toast.error('Image size must be less than 5MB');
-        return;
-      }
-      
       if (!file.type.startsWith('image/')) {
         toast.error('Please select an image file');
         return;
       }
 
-      // Show cropper instead of directly setting the image
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImageToCrop(reader.result as string);
-        setShowCropper(true);
-      };
-      reader.readAsDataURL(file);
+      // Show loading toast for compression
+      const originalSizeKB = file.size / 1024;
+      console.log(`Original image size: ${formatFileSize(file.size)}`);
+      
+      if (originalSizeKB > 1024) { // If larger than 1MB, show compression message
+        toast.loading('Compressing image...', { id: 'compress' });
+      }
+
+      try {
+        // Compress the image to under 1MB (1024KB) for better upload performance
+        const compressedFile = await compressImageToTarget(file, 1024);
+        const compressedSizeKB = compressedFile.size / 1024;
+        
+        console.log(`Compressed image size: ${formatFileSize(compressedFile.size)}`);
+        
+        if (originalSizeKB > 1024) {
+          const compressionRatio = ((originalSizeKB - compressedSizeKB) / originalSizeKB * 100).toFixed(1);
+          toast.success(`Image compressed by ${compressionRatio}%`, { id: 'compress' });
+        }
+
+        // Show cropper with the compressed image
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setImageToCrop(reader.result as string);
+          setShowCropper(true);
+        };
+        reader.readAsDataURL(compressedFile);
+        
+        // Store the compressed file for later use
+        (window as any).compressedImageFile = compressedFile;
+        
+      } catch (error) {
+        console.error('Failed to compress image:', error);
+        toast.error('Failed to process image. Please try a different image.', { id: 'compress' });
+      }
     }
   };
 
   const handleSkipCrop = () => {
-    // Use the original image without cropping
-    if (imageToCrop) {
-      // Convert data URL back to file
-      fetch(imageToCrop)
-        .then(res => res.blob())
-        .then(blob => {
-          const file = new File([blob], 'image.jpg', { type: 'image/jpeg' });
-          setSelectedImage(file);
-          setImagePreview(imageToCrop);
-          setShowCropper(false);
-          setImageToCrop(null);
-          
-          // Clear file input
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
-        });
+    // Use the compressed image without cropping
+    const compressedFile = (window as any).compressedImageFile;
+    if (compressedFile && imageToCrop) {
+      setSelectedImage(compressedFile);
+      setImagePreview(imageToCrop);
+      setShowCropper(false);
+      setImageToCrop(null);
+      
+      // Clear the temporary storage
+      delete (window as any).compressedImageFile;
+      
+      // Clear file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
-  const handleCropComplete = (croppedBlob: Blob) => {
-    // Convert blob to file
-    const croppedFile = new File([croppedBlob], 'cropped-image.jpg', { type: 'image/jpeg' });
-    setSelectedImage(croppedFile);
-    
-    // Create preview
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(croppedFile);
-    
-    // Close cropper
-    setShowCropper(false);
-    setImageToCrop(null);
-    
-    // Clear file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  const handleCropComplete = async (croppedBlob: Blob) => {
+    try {
+      // Convert blob to file
+      const croppedFile = new File([croppedBlob], 'cropped-image.jpg', { type: 'image/jpeg' });
+      
+      // Compress the cropped image if it's still too large
+      const finalFile = await compressImageToTarget(croppedFile, 1024);
+      
+      setSelectedImage(finalFile);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(finalFile);
+      
+      // Close cropper
+      setShowCropper(false);
+      setImageToCrop(null);
+      
+      // Clear the temporary storage
+      delete (window as any).compressedImageFile;
+      
+      // Clear file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('Failed to process cropped image:', error);
+      toast.error('Failed to process cropped image');
     }
   };
 
   const handleCropCancel = () => {
     setShowCropper(false);
     setImageToCrop(null);
+    
+    // Clear the temporary storage
+    delete (window as any).compressedImageFile;
+    
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }

@@ -13,6 +13,7 @@ import BottomNav from '@/components/BottomNav';
 import ImageCropper from '@/components/ImageCropper';
 import EditRepostModal from '@/components/EditRepostModal';
 import LikesModal from '@/components/LikesModal';
+import { compressImageToTarget, formatFileSize } from '@/utils/imageCompression';
 
 interface Status {
   id: string;
@@ -413,7 +414,7 @@ export default function StatusPage() {
     return date.toLocaleDateString();
   };
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -425,33 +426,76 @@ export default function StatusPage() {
 
     // Only process the first file
     const file = files[0];
-    setCurrentFileToAdd(file); // Store the original file
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImageToCrop(reader.result as string);
-      setCurrentCroppingIndex(selectedImages.length);
-      setShowCropper(true);
-    };
-    reader.readAsDataURL(file);
+    
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Show loading toast for compression
+    const originalSizeKB = file.size / 1024;
+    console.log(`Original status image size: ${formatFileSize(file.size)}`);
+    
+    if (originalSizeKB > 1024) { // If larger than 1MB, show compression message
+      toast.loading('Compressing image...', { id: 'compress-status' });
+    }
+
+    try {
+      // Compress the image to under 1MB (1024KB) for better upload performance
+      const compressedFile = await compressImageToTarget(file, 1024);
+      const compressedSizeKB = compressedFile.size / 1024;
+      
+      console.log(`Compressed status image size: ${formatFileSize(compressedFile.size)}`);
+      
+      if (originalSizeKB > 1024) {
+        const compressionRatio = ((originalSizeKB - compressedSizeKB) / originalSizeKB * 100).toFixed(1);
+        toast.success(`Image compressed by ${compressionRatio}%`, { id: 'compress-status' });
+      }
+
+      // Store the compressed file for later use
+      setCurrentFileToAdd(compressedFile);
+      
+      // Show cropper with the compressed image
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImageToCrop(reader.result as string);
+        setCurrentCroppingIndex(selectedImages.length);
+        setShowCropper(true);
+      };
+      reader.readAsDataURL(compressedFile);
+
+    } catch (error) {
+      console.error('Failed to compress status image:', error);
+      toast.error('Failed to process image. Please try a different image.', { id: 'compress-status' });
+    }
 
     // Reset input
     e.target.value = '';
   };
 
-  const handleCropComplete = (croppedImage: Blob) => {
-    // Convert blob to file
-    const file = new File([croppedImage], `cropped-${Date.now()}.jpg`, { type: 'image/jpeg' });
-    
-    setSelectedImages(prev => [...prev, file]);
-    
-    // Create preview URL
-    const previewUrl = URL.createObjectURL(croppedImage);
-    setImagePreviewUrls(prev => [...prev, previewUrl]);
-    
-    // Close cropper
-    setShowCropper(false);
-    setImageToCrop(null);
-    setCurrentCroppingIndex(null);
+  const handleCropComplete = async (croppedImage: Blob) => {
+    try {
+      // Convert blob to file
+      const croppedFile = new File([croppedImage], `cropped-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      
+      // Compress the cropped image if it's still too large
+      const finalFile = await compressImageToTarget(croppedFile, 1024);
+      
+      setSelectedImages(prev => [...prev, finalFile]);
+      
+      // Create preview URL from the final compressed file
+      const previewUrl = URL.createObjectURL(finalFile);
+      setImagePreviewUrls(prev => [...prev, previewUrl]);
+      
+      // Close cropper
+      setShowCropper(false);
+      setImageToCrop(null);
+      setCurrentCroppingIndex(null);
+      setCurrentFileToAdd(null);
+    } catch (error) {
+      console.error('Failed to process cropped status image:', error);
+      toast.error('Failed to process cropped image');
+    }
   };
 
   const handleCropCancel = () => {
@@ -462,11 +506,11 @@ export default function StatusPage() {
   };
 
   const handleSkipCrop = () => {
-    // Use the original file without cropping
+    // Use the compressed file without cropping
     if (currentFileToAdd) {
       setSelectedImages(prev => [...prev, currentFileToAdd]);
       
-      // Create preview URL from original file
+      // Create preview URL from compressed file
       const previewUrl = URL.createObjectURL(currentFileToAdd);
       setImagePreviewUrls(prev => [...prev, previewUrl]);
     }
@@ -528,9 +572,7 @@ export default function StatusPage() {
       console.error('Failed to create status:', error);
       
       // Handle specific error cases
-      if (error.response?.status === 413 || error.message?.includes('File too large') || error.message?.includes('413')) {
-        toast.error('Image file is too large. Please reduce the image size and try again.');
-      } else if (error.response?.status === 400) {
+      if (error.response?.status === 400) {
         const errorMessage = error.response?.data?.message;
         if (errorMessage?.includes('image') || errorMessage?.includes('file')) {
           toast.error('Invalid image format. Please use JPG, PNG, or GIF files.');
@@ -550,11 +592,7 @@ export default function StatusPage() {
       } else {
         // Generic fallback
         const errorMessage = error.response?.data?.message || error.message;
-        if (errorMessage?.toLowerCase().includes('size') || errorMessage?.toLowerCase().includes('large')) {
-          toast.error('Image file is too large. Please reduce the image size and try again.');
-        } else {
-          toast.error(errorMessage || 'Failed to post status. Please try again.');
-        }
+        toast.error(errorMessage || 'Failed to post status. Please try again.');
       }
     } finally {
       setIsPosting(false);
